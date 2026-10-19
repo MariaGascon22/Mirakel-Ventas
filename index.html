@@ -379,7 +379,7 @@ function aj(){ return Object.assign({ meta:0 }, data.ajustes||{}); }
    Los datos se guardan primero en este dispositivo (localStorage). Si NUBE_URL tiene la dirección del Worker
    de Cloudflare, cada cambio se sube solo a la nube (D1) y se bajan los cambios hechos en otros dispositivos.
    Sin internet se sigue trabajando: los cambios quedan pendientes y se suben al volver la conexión. */
-const NUBE_URL=''; /* p. ej. 'https://mirakel-ventas.<tu-cuenta>.workers.dev' (ver cloudflare/README.md) */
+const NUBE_URL='https://mirakel-ventas.majohoran22.workers.dev'; /* p. ej. 'https://mirakel-ventas.<tu-cuenta>.workers.dev' (ver cloudflare/README.md) */
 /* Solo se usan mientras no haya nube; con nube, el Worker revisa usuario y contraseña.
    La huella es SHA-256 de "mirakel-ventas|usuario|contraseña". */
 const USUARIOS=[
