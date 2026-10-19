@@ -345,7 +345,7 @@ div.t-mv{cursor:default}
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
-<script src="vendor/supabase.js"></script>
+<script src="version.js"></script>
 <script>
 (function(){
 "use strict";
@@ -371,56 +371,51 @@ const data={ ventas:{}, gastos:{}, clientas:{}, cuentas:{}, ajustes:null };
 const ui={ view:'resumen', mes:hoyISO().slice(0,7), sheet:false };
 function aj(){ return Object.assign({ meta:0 }, data.ajustes||{}); }
 
-/* ============ Base de datos (Supabase) ============
-   Misma base y mismo usuario que la app de apartados; esta app solo usa las tablas ventas y gastos,
-   y guarda sus ajustes en el registro "ventas" de la tabla ajustes. */
-const SUPABASE_URL='https://lqgokadzwrqumxuvxeyx.supabase.co';
-const SUPABASE_KEY='sb_publishable_Hq1jXETFSbOvttseJd87jg_PsEfSyPX';
-const sb=window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:'mirakel-ventas-auth' } });
+/* ============ Usuarios y datos ============
+   No hay servidor: las ventas, gastos y ajustes se guardan en este dispositivo (localStorage).
+   Las contraseñas no se guardan en texto: se compara su huella SHA-256 de "mirakel-ventas|usuario|contraseña". */
+const USUARIOS=[
+  { usuario:'karina', nombre:'Karina', huella:'36cb81a916299a755b2f75885800bcb4e17ec7e71354cfb2c8579024aa9e5150' }
+];
+const CLAVE_DATOS='mirakel-ventas-datos', CLAVE_SESION='mirakel-ventas-sesion';
+async function huella(usuario,pass){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mirakel-ventas|'+usuario+'|'+pass));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function usuarioDe(u){ u=String(u||'').trim().toLowerCase(); return USUARIOS.find(x=>x.usuario===u)||null; }
+function leerLS(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } }
 function explicarError(e){
-  const m=String((e&&(e.message||e.msg))||e||''), code=e&&e.code;
-  if(code==='42501'||/row-level security|permission denied/i.test(m)) return 'Tu base de datos no permitió guardar. Revisa que el texto de las tablas se haya corrido con “Success”.';
-  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Sin conexión a internet. Revisa tu señal e intenta de nuevo.';
-  if(/JWT|session|token/i.test(m)) return 'Tu sesión expiró. Cierra sesión y vuelve a entrar.';
-  return 'Ocurrió un error con la base de datos: '+m;
+  const m=String((e&&(e.message||e.name))||e||'');
+  if(e&&(e.name==='QuotaExceededError'||/quota/i.test(m))) return 'El teléfono no tiene espacio para guardar. Descarga un respaldo y libera espacio.';
+  return 'No se pudo guardar: '+m;
 }
-/* Supabase entrega como máximo 1000 filas por consulta: se piden por páginas hasta que no quede ninguna. */
-async function todasLasFilas(coll){
-  const out=[], N=1000;
-  for(let i=0;;){ const {data:rows,error}=await sb.from(coll).select('id,data').order('id').range(i,i+N-1); if(error) throw error; if(!rows||!rows.length) return out; out.push(...rows); i+=rows.length; }
-}
-/* Se entra con usuario y contraseña; Supabase pide correo, así que el usuario se convierte en un correo interno.
-   Si se escribe un correo completo (con @), se usa tal cual. */
-const DOMINIO_USUARIOS='mirakel.app';
-function correoDeUsuario(u){ u=String(u||'').trim().toLowerCase(); return u.indexOf('@')>=0?u:u+'@'+DOMINIO_USUARIOS; }
-function usuarioDeCorreo(c){ c=String(c||''); const fin='@'+DOMINIO_USUARIOS; return c.toLowerCase().endsWith(fin)?c.slice(0,-fin.length):c; }
-function filasAMapa(rows){ const o={}; (rows||[]).forEach(r=>{ o[r.id]=Object.assign({}, r.data||{}, {id:r.id}); }); return o; }
 const Store={
-  user:null, errorCaja:null, cargado:false, ultima:0,
-  async init(){
-    sb.auth.onAuthStateChange((ev,session)=>{ if(ev==='SIGNED_OUT'){ this.limpiar(); mostrarLogin(); } else if(session&&session.user) this.user=session.user; });
-    let session=null; try{ const r=await sb.auth.getSession(); session=r.data&&r.data.session; }catch(e){}
-    if(session){ this.user=session.user; mostrarApp(); await this.cargar(); } else mostrarLogin();
+  user:null, cargado:false,
+  init(){
+    try{ Object.keys(localStorage).filter(k=>/^mirakel-ventas-auth/.test(k)||/^sb-/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} /* sesión vieja de Supabase */
+    if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    const s=leerLS(CLAVE_SESION), u=s&&usuarioDe(s.usuario);
+    if(u){ this.user=u; mostrarApp(); this.cargar(); } else mostrarLogin();
   },
-  async cargar(){
-    try{
-      const r=await Promise.all([todasLasFilas('ventas'), todasLasFilas('gastos')]);
-      data.ventas=filasAMapa(r[0]); data.gastos=filasAMapa(r[1]); this.errorCaja=null;
-    }catch(e){ const m=String((e&&e.message)||''), c=e&&e.code; this.errorCaja=(c==='42P01'||c==='PGRST205'||/does not exist|Could not find the table/i.test(m))?'faltan':explicarError(e); }
-    try{ const a=await sb.from('ajustes').select('id,data').eq('id','ventas'); if(!a.error && a.data && a.data[0]) data.ajustes=a.data[0].data; }catch(e){}
-    this.cargado=true; this.ultima=Date.now(); render();
+  entrar(u){ this.user=u; try{ localStorage.setItem(CLAVE_SESION, JSON.stringify({usuario:u.usuario})); }catch(e){} mostrarApp(); this.cargar(); },
+  cargar(){ const d=leerLS(CLAVE_DATOS)||{}; data.ventas=d.ventas||{}; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null; this.cargado=true; render(); },
+  guardar(){ localStorage.setItem(CLAVE_DATOS, JSON.stringify({version:1, ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes})); },
+  /* Aplica un cambio y lo guarda; si no se pudo guardar, deja los datos como estaban. */
+  cambiar(fn){
+    const antes={ventas:Object.assign({},data.ventas), gastos:Object.assign({},data.gastos), ajustes:data.ajustes};
+    try{ fn(); this.guardar(); }catch(e){ Object.assign(data,antes); throw e; }
+    render();
   },
-  limpiar(){ this.user=null; this.cargado=false; this.errorCaja=null; data.ventas={}; data.gastos={}; data.ajustes=null; if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; },
+  limpiar(){ this.user=null; this.cargado=false; data.ventas={}; data.gastos={}; data.ajustes=null; try{ localStorage.removeItem(CLAVE_SESION); }catch(e){} if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; },
   newId(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); },
-  async put(coll,id,obj){ const body=Object.assign({},obj); delete body.id; const {error}=await sb.from(coll).upsert({id, data:body, updated_at:new Date().toISOString()}); if(error) throw error; data[coll][id]=Object.assign({},body,{id}); render(); },
-  async del(coll,id){ const {error}=await sb.from(coll).delete().eq('id',id); if(error) throw error; delete data[coll][id]; render(); },
-  async putAjustes(obj){ const {error}=await sb.from('ajustes').upsert({id:'ventas', data:obj, updated_at:new Date().toISOString()}); if(error) throw error; data.ajustes=obj; render(); },
+  async put(coll,id,obj){ this.cambiar(()=>{ data[coll][id]=Object.assign({},obj,{id}); }); },
+  async del(coll,id){ this.cambiar(()=>{ delete data[coll][id]; }); },
+  async putAjustes(obj){ this.cambiar(()=>{ data.ajustes=obj; }); },
   async importar(r){
-    const filas=(coll)=>Object.entries(r[coll]||{}).map(([id,o])=>{ const d=Object.assign({},o); delete d.id; return {id, data:d, updated_at:new Date().toISOString()}; });
+    const filas=(coll)=>Object.entries((r[coll]&&!Array.isArray(r[coll]))?r[coll]:{}).filter(([,o])=>o&&typeof o==='object');
     const v=filas('ventas'), g=filas('gastos');
-    if(v.length){ const x=await sb.from('ventas').upsert(v); if(x.error) throw x.error; }
-    if(g.length){ const x=await sb.from('gastos').upsert(g); if(x.error) throw x.error; }
-    await this.cargar(); return {ventas:v.length, gastos:g.length};
+    this.cambiar(()=>{ v.forEach(([id,o])=>{ data.ventas[id]=Object.assign({},o,{id}); }); g.forEach(([id,o])=>{ data.gastos[id]=Object.assign({},o,{id}); }); if(r.ajustes&&typeof r.ajustes==='object') data.ajustes=r.ajustes; });
+    return {ventas:v.length, gastos:g.length};
   }
 };
 function mostrarLogin(){ $('#app-shell').hidden=true; $('#login').hidden=false; setTimeout(()=>{ const e=$('#l-user'); if(e) e.focus(); },50); }
@@ -433,7 +428,6 @@ function cerrarHoja(){ $('#sheet').hidden=true; $('#sheet-box').innerHTML=''; ui
 function headHoja(t,sub){ return '<div class="sheet-head"><div style="min-width:0;margin-right:auto"><h2 id="sheet-title">'+t+'</h2>'+(sub?'<p class="sub">'+sub+'</p>':'')+'</div><button class="icon-btn" data-act="close" aria-label="Cerrar">'+ICON.x+'</button></div>'; }
 let toastT=null;
 function toast(t){ const el=$('#toast'); el.textContent=t; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ el.hidden=true; },2800); }
-async function copiar(t,ok){ try{ await navigator.clipboard.writeText(t); toast(ok||'Copiado'); }catch(e){ toast('No se pudo copiar automáticamente. Selecciona el texto y cópialo.'); } }
 function guardarArchivo(filename, blob){
   try{ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),8000); toast('Descargando '+filename); }
   catch(e){ toast('No se pudo descargar el archivo.'); }
@@ -445,10 +439,7 @@ const METODOS=['Efectivo','Transferencia','Tarjeta','Otro'];
 const ARTICULOS=['Aretes','Collar','Pulsera','Reloj','Anillo','Café'];
 const LUGARES=['DIF','Bazar','Boutique','Otro'];
 const TIPOS_GASTO=['Empaques','Joyería','Insumo Café'];
-/* Versión de la app que se muestra en Ajustes: súbela con cada cambio que se publique. */
-const APP_VERSION='1.3.0', APP_FECHA='2026-10-19';
 const COMISION_TARJETA=0.045; /* lo que cobra la terminal: se resta de cada venta con tarjeta */
-const SQL_CAJA="create table ventas (\n  id text primary key,\n  data jsonb not null,\n  owner uuid not null default auth.uid() references auth.users,\n  updated_at timestamptz not null default now()\n);\ncreate table gastos (\n  id text primary key,\n  data jsonb not null,\n  owner uuid not null default auth.uid() references auth.users,\n  updated_at timestamptz not null default now()\n);\n\nalter table ventas enable row level security;\nalter table gastos enable row level security;\n\ncreate policy \"Solo la duena\" on ventas for all\n  using (owner = auth.uid()) with check (owner = auth.uid());\ncreate policy \"Solo la duena\" on gastos for all\n  using (owner = auth.uid()) with check (owner = auth.uid());";
 const DIAS_SEM=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const DIAS_LARGO=['los lunes','los martes','los miércoles','los jueves','los viernes','los sábados','los domingos'];
 function mesActual(){ return hoyISO().slice(0,7); }
@@ -484,11 +475,6 @@ function selMes(){
 function tHead(t, sub, btn, act, extra){
   return '<div class="t-phead"><div class="t-ttl"><h1>'+t+'</h1><p>'+sub+'</p></div>'+selMes()+(extra||'')+'<button class="btn btn-primary" data-act="'+act+'">'+ICON.plus+btn+'</button></div>';
 }
-function avisoCaja(){
-  if(!Store.errorCaja) return '';
-  if(Store.errorCaja!=='faltan') return '<div class="banner"><span><b>Atención.</b> '+esc(Store.errorCaja)+'</span><button class="btn btn-sm" data-act="reintentar">Reintentar</button></div>';
-  return '<div class="panel"><h2>Falta un paso en Supabase</h2><p class="lead">Para guardar ventas y gastos, tu base de datos necesita dos tablas nuevas. Entra a Supabase → <b>SQL Editor</b> → <b>New query</b>, pega este texto y toca <b>Run</b>. Debe salir “Success”. Luego vuelve aquí y toca Reintentar.</p><pre class="sqlbox">'+esc(SQL_CAJA)+'</pre><div class="actions"><button class="btn btn-primary" data-act="copiar-sql-caja">'+ICON.copy+'Copiar texto</button><button class="btn" data-act="reintentar">Reintentar</button></div></div>';
-}
 function tBarras(obj, orden, cls){
   let ent=Object.entries(obj).filter(e=>e[1]>0);
   ent.sort((a,b)=>b[1]-a[1]);
@@ -514,7 +500,6 @@ function vResumen(){
   const margen = n.ing>0 ? Math.round(n.util/n.ing*100) : 0;
   const hoyN = esAct ? sumNeto(n.V.filter(v=>v.fecha===hoyISO())) : 0;
   let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta','<button class="btn" data-act="exportar-mes">'+ICON.dl+'Exportar</button>');
-  h+=avisoCaja();
   h+='<div class="t-g1"><div class="t-stack">';
   h+='<section class="t-card t-hero"><div class="t-ch"><h2>Utilidad del mes</h2></div><div class="t-big num">'+signo(n.util)+'</div><div class="t-krow">'+tchip(n.util,p.util)+'<span class="t-vs">'+(p.util?'vs '+esc(mesSolo(prev)):'Ingresos menos gastos')+'</span></div></section>';
   h+='<section class="t-card"><div class="t-ch"><h2>Gastos del mes</h2></div><div class="t-big num">'+money(n.g)+'</div><div class="t-krow">'+tchip(n.g,p.g,true)+'<span class="t-vs">'+(p.g?'vs '+esc(mesSolo(prev)):'Empaques, joyería e insumos de café')+'</span></div></section>';
@@ -550,7 +535,6 @@ function vVentas(){
   const m=ui.mes, n=numerosMes(m), esAct=m===mesActual();
   const hoyL=n.V.filter(v=>v.fecha===hoyISO()), hoyN=sumNeto(hoyL), hoyC=sumar(hoyL), piezas=n.V.reduce((s,v)=>s+(Number(v.piezas)||1),0);
   let h=tHead('Ventas','Tus ventas del día a día, sin datos de clientas','Registrar venta','nueva-venta');
-  h+=avisoCaja();
   h+='<div class="t-kpis">'+(esAct?'<div class="t-card t-hero"><small>Vendido hoy</small><b class="num">'+money(hoyN)+'</b>'+(hoyC!==hoyN?'<span class="t-fee">Cobrado '+money(hoyC)+'</span>':'')+'</div>':'<div class="t-card t-hero"><small>Ventas</small><b class="num">'+n.V.length+'</b></div>')+
      '<div class="t-card"><small>Total del mes</small><b class="num">'+money(n.v)+'</b>'+(n.comision>0?'<span class="t-fee">Comisión −'+money(n.comision)+'</span>':'')+'</div><div class="t-card"><small>Piezas</small><b class="num">'+piezas+'</b></div></div>';
   if(!n.V.length){ h+='<section class="t-card t-empty"><h2>Sin ventas en '+esc(mesSolo(m))+'</h2><p>Registra cada venta con el artículo, el monto, el método de pago y el lugar.</p><button class="btn btn-primary" data-act="nueva-venta">'+ICON.plus+'Registrar venta</button></section>'; return h; }
@@ -564,7 +548,6 @@ function vVentas(){
 function vGastos(){
   const m=ui.mes, n=numerosMes(m), por=agrupar(n.G,tipoDe,g=>Number(g.monto)||0);
   let h=tHead('Gastos','Empaques, joyería e insumos de café','Registrar gasto','nuevo-gasto');
-  h+=avisoCaja();
   h+='<div class="t-kpis k4"><div class="t-card t-hero"><small>Total del mes</small><b class="num">'+money(n.g)+'</b></div>'+TIPOS_GASTO.map(t=>'<div class="t-card"><small>'+esc(t)+'</small><b class="num">'+money(por[t]||0)+'</b></div>').join('')+'</div>';
   if(!n.G.length){ h+='<section class="t-card t-empty"><h2>Sin gastos en '+esc(mesSolo(m))+'</h2><p>Registra cada compra de empaques, joyería o insumos de café.</p><button class="btn btn-primary" data-act="nuevo-gasto">'+ICON.plus+'Registrar gasto</button></section>'; return h; }
   const dias={}; n.G.forEach(g=>{ (dias[g.fecha]=dias[g.fecha]||[]).push(g); });
@@ -637,8 +620,8 @@ function vAjustes(){
   let h='<div class="t-phead"><div class="t-ttl"><h1>Ajustes</h1><p>Tu meta, tus datos y tu cuenta</p></div></div>';
   h+='<form id="f-ajustes" class="t-card" novalidate style="display:grid;gap:14px"><h2 style="font-size:17px">Meta de ventas del mes</h2><div class="field"><label for="a-meta">Meta en pesos</label><input id="a-meta" type="number" min="0" step="100" inputmode="numeric" placeholder="Ej. 20000" value="'+(Number(A.meta)>0?esc(A.meta):'')+'"><span class="help">Se muestra como barra de avance en Resumen. Déjalo vacío si no quieres meta.</span></div><div class="actions" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">Guardar meta</button></div></form>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Respaldo</h2><p class="lead">Descarga todas tus ventas y gastos en un archivo. Guárdalo en tu Drive o mándatelo por correo. Con “Importar respaldo” lo recuperas.</p><div class="actions"><button type="button" class="btn" data-act="exportar-json">'+ICON.dl+'Descargar respaldo</button><label class="btn" for="imp-json">Importar respaldo</label><input id="imp-json" type="file" accept=".json,application/json" hidden><button type="button" class="btn" data-act="exportar-mes">'+ICON.dl+'Excel del mes</button></div></section>';
-  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(usuarioDeCorreo(Store.user&&Store.user.email))+'</b>. Solo las usuarias autorizadas pueden ver estos datos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
-  h+='<p class="t-version num">MiraKel Ventas · versión '+APP_VERSION+' · '+fCorta(APP_FECHA)+'</p>';
+  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.nombre||'')+'</b>. Tus ventas y gastos se guardan solo en este dispositivo: descarga un respaldo seguido para no perderlos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
+  h+='<p class="t-version num">MiraKel Ventas · versión '+esc(window.APP_VERSION||'')+' · '+fCorta(window.APP_FECHA)+'</p>';
   return h;
 }
 
@@ -647,7 +630,6 @@ let pend=false;
 function render(){ if(pend) return; pend=true; requestAnimationFrame(()=>{ pend=false; renderNow(); }); }
 function renderNow(){
   document.querySelectorAll('[data-act="nav"]').forEach(b=>{ if(b.dataset.view===ui.view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
-  const b=$('#banner'); const bh=(Store.errorCaja&&Store.errorCaja!=='faltan'&&ui.view==='ajustes')?'<div class="banner"><span><b>Atención.</b> '+esc(Store.errorCaja)+'</span><button class="btn btn-sm" data-act="reintentar">Reintentar</button></div>':''; if(b.innerHTML!==bh) b.innerHTML=bh;
   if(!Store.cargado) return;
   const main=$('#main');
   if(ui.view==='ajustes' && main.dataset.view==='ajustes' && main.contains(document.activeElement) && document.activeElement.tagName==='INPUT') return;
@@ -668,11 +650,10 @@ const acciones={
   'pedir-borrar-mov'(el){ $('#mov-confirm').innerHTML='<div class="confirm-box"><b>¿Eliminar este registro?</b><span class="hint">No se puede deshacer.</span><div class="actions"><button type="button" class="btn btn-danger" data-act="borrar-mov" data-coll="'+esc(el.dataset.coll)+'" data-id="'+esc(el.dataset.id)+'">Sí, eliminar</button><button type="button" class="btn" data-act="cancelar-confirm">Cancelar</button></div></div>'; },
   async 'borrar-mov'(el){ try{ await Store.del(el.dataset.coll, el.dataset.id); cerrarHoja(); toast('Registro eliminado'); }catch(e){ toast(explicarError(e)); } },
   'cancelar-confirm'(el){ el.closest('.confirm-box').parentElement.innerHTML=''; },
-  'copiar-sql-caja'(){ copiar(SQL_CAJA,'Texto copiado: pégalo en el SQL Editor'); },
-  reintentar(){ Store.cargar(); },
   'exportar-mes'(){ exportarMes(); },
-  'exportar-json'(){ guardarArchivo('Respaldo ventas MiraKel '+hoyISO()+'.json', new Blob([JSON.stringify({version:1, app:'ventas', exportado:new Date().toISOString(), ventas:data.ventas, gastos:data.gastos},null,1)],{type:'application/json'})); },
-  async salir(){ try{ await sb.auth.signOut(); }catch(e){} Store.limpiar(); mostrarLogin(); }
+  'exportar-json'(){ guardarArchivo('Respaldo ventas MiraKel '+hoyISO()+'.json', new Blob([JSON.stringify({version:1, app:'ventas', exportado:new Date().toISOString(), ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes},null,1)],{type:'application/json'})); },
+  salir(){ Store.limpiar(); mostrarLogin(); },
+  actualizar(el){ el.disabled=true; el.textContent='Actualizando…'; if(swEsperando) swEsperando.postMessage('activar'); else location.reload(); }
 };
 document.addEventListener('click', e=>{
   const el=e.target.closest('[data-act]'); if(!el) return; const fn=acciones[el.dataset.act]; if(!fn) return;
@@ -685,7 +666,6 @@ document.addEventListener('change', async e=>{
   catch(ex){ toast(ex&&ex.message==='formato'?'Ese archivo no es un respaldo de ventas de MiraKel.':explicarError(ex)); }
   e.target.value='';
 });
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && Store.user && Date.now()-Store.ultima>30000 && $('#sheet').hidden) Store.cargar(); });
 
 /* ============ Formularios ============ */
 document.getElementById('f-login').addEventListener('submit', async ev=>{
@@ -693,10 +673,11 @@ document.getElementById('f-login').addEventListener('submit', async ev=>{
   const usuario=$('#l-user').value.trim(), password=$('#l-pass').value, msg=$('#l-err'), btn=$('#l-btn');
   if(!usuario||!password){ msg.textContent='Escribe tu usuario y tu contraseña.'; msg.hidden=false; return; }
   btn.disabled=true; btn.textContent='Entrando…'; msg.hidden=true;
-  const {data:res, error}=await sb.auth.signInWithPassword({email:correoDeUsuario(usuario),password});
+  const u=usuarioDe(usuario); let ok=false;
+  try{ ok=!!u && (await huella(u.usuario,password))===u.huella; }catch(e){ console.error(e); }
   btn.disabled=false; btn.textContent='Entrar';
-  if(error){ const m=String(error.message||''); msg.textContent=/Invalid login/i.test(m)?'Usuario o contraseña incorrectos.':/Failed to fetch|Load failed|NetworkError/i.test(m)?'Sin conexión a internet. Revisa tu señal.':'No se pudo entrar: '+m; msg.hidden=false; return; }
-  Store.user=res.user; $('#l-pass').value=''; mostrarApp(); await Store.cargar();
+  if(!ok){ msg.textContent='Usuario o contraseña incorrectos.'; msg.hidden=false; return; }
+  $('#l-pass').value=''; Store.entrar(u);
 });
 document.addEventListener('submit', async e=>{
   const f=e.target; if(f.id==='f-login') return;
@@ -731,7 +712,29 @@ document.addEventListener('submit', async e=>{
 });
 
 Store.init();
-if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+/* ============ Nueva versión ============
+   El service worker sirve la app guardada. Cuando se publica una versión nueva, se descarga en segundo plano
+   y se muestra un aviso; al tocar "Actualizar" se activa y la página se recarga. */
+let swEsperando=null;
+function avisoVersion(sw){
+  swEsperando=sw;
+  $('#banner').innerHTML='<div class="banner" role="status"><span><b>Hay una nueva versión de la app.</b> Actualiza para usarla.</span><button class="btn btn-sm btn-primary" data-act="actualizar">Actualizar</button></div>';
+}
+if('serviceWorker' in navigator){
+  let recargando=false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(recargando) return; recargando=true; location.reload(); });
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+      const vigilar=(sw)=>{ if(!sw) return; sw.addEventListener('statechange', ()=>{ if(sw.state==='installed' && navigator.serviceWorker.controller) avisoVersion(sw); }); };
+      if(reg.waiting && navigator.serviceWorker.controller) avisoVersion(reg.waiting);
+      vigilar(reg.installing);
+      reg.addEventListener('updatefound', ()=>vigilar(reg.installing));
+      const revisar=()=>{ reg.update().catch(()=>{}); };
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) revisar(); });
+      setInterval(revisar, 30*60*1000);
+    }).catch(()=>{});
+  });
+}
 })();
 </script>
 </body>

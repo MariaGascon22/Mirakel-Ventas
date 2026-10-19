@@ -6,7 +6,9 @@ App de ventas, gastos y resumen del mes de MiraKel Accesorios.
 - **Gastos:** tipo (Empaques, Joyería, Insumo Café), monto y método de pago.
 - **Resumen:** utilidad, margen, ventas por día, por método y por lugar, y gastos por tipo.
 
-Los datos se guardan en Supabase, en las tablas `ventas` y `gastos`, protegidas por inicio de sesión.
+Se entra con usuario y contraseña (la lista está en `USUARIOS`, en `index.html`). Las ventas, gastos y ajustes se guardan solo en el dispositivo; usa **Ajustes → Descargar respaldo** seguido y **Importar respaldo** para pasarlos a otro teléfono.
+
+Cuando se publica una versión nueva (cambia `version.js`), la app muestra un aviso para actualizar.
 
 ## Publicar en GitHub Pages
 1. Sube todos estos archivos a la raíz del repositorio.
