@@ -1,6 +1,6 @@
 /* MiraKel Ventas: guarda la app en el teléfono para que abra rápido.
    Los datos de clientas NO se guardan aquí: siempre vienen de tu base de datos. */
-const VERSION = 'mk-ventas-v1';
+const VERSION = 'mk-ventas-v2';
 const ARCHIVOS = ['./','./index.html','./manifest.webmanifest','./vendor/supabase.js',
   './assets/logo.png','./assets/wings.png','./assets/firma.png',
   './icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png','./icons/favicon.png'];
@@ -10,9 +10,9 @@ self.addEventListener('fetch', e => {
   const req = e.request; const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return; // Supabase y fuentes van directo a internet
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { const copia = r.clone(); caches.open(VERSION).then(c => c.put('./index.html', copia)); return r; })
+    e.respondWith(fetch(req).then(r => { if (r.ok) { const copia = r.clone(); caches.open(VERSION).then(c => c.put('./index.html', copia)); } return r; })
       .catch(() => caches.match('./index.html')));
     return;
   }
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); return r; })));
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { if (r.ok) { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); } return r; })));
 });

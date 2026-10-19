@@ -384,23 +384,28 @@ function explicarError(e){
   if(/JWT|session|token/i.test(m)) return 'Tu sesión expiró. Cierra sesión y vuelve a entrar.';
   return 'Ocurrió un error con la base de datos: '+m;
 }
+/* Supabase entrega como máximo 1000 filas por consulta: se piden por páginas hasta que no quede ninguna. */
+async function todasLasFilas(coll){
+  const out=[], N=1000;
+  for(let i=0;;){ const {data:rows,error}=await sb.from(coll).select('id,data').order('id').range(i,i+N-1); if(error) throw error; if(!rows||!rows.length) return out; out.push(...rows); i+=rows.length; }
+}
 function filasAMapa(rows){ const o={}; (rows||[]).forEach(r=>{ o[r.id]=Object.assign({}, r.data||{}, {id:r.id}); }); return o; }
 const Store={
   user:null, errorCaja:null, cargado:false, ultima:0,
   async init(){
-    sb.auth.onAuthStateChange((ev,session)=>{ if(ev==='SIGNED_OUT'){ this.user=null; mostrarLogin(); } else if(session&&session.user) this.user=session.user; });
+    sb.auth.onAuthStateChange((ev,session)=>{ if(ev==='SIGNED_OUT'){ this.limpiar(); mostrarLogin(); } else if(session&&session.user) this.user=session.user; });
     let session=null; try{ const r=await sb.auth.getSession(); session=r.data&&r.data.session; }catch(e){}
     if(session){ this.user=session.user; mostrarApp(); await this.cargar(); } else mostrarLogin();
   },
   async cargar(){
     try{
-      const r=await Promise.all([sb.from('ventas').select('id,data'), sb.from('gastos').select('id,data')]);
-      r.forEach(x=>{ if(x.error) throw x.error; });
-      data.ventas=filasAMapa(r[0].data); data.gastos=filasAMapa(r[1].data); this.errorCaja=null;
+      const r=await Promise.all([todasLasFilas('ventas'), todasLasFilas('gastos')]);
+      data.ventas=filasAMapa(r[0]); data.gastos=filasAMapa(r[1]); this.errorCaja=null;
     }catch(e){ const m=String((e&&e.message)||''), c=e&&e.code; this.errorCaja=(c==='42P01'||c==='PGRST205'||/does not exist|Could not find the table/i.test(m))?'faltan':explicarError(e); }
     try{ const a=await sb.from('ajustes').select('id,data').eq('id','ventas'); if(!a.error && a.data && a.data[0]) data.ajustes=a.data[0].data; }catch(e){}
     this.cargado=true; this.ultima=Date.now(); render();
   },
+  limpiar(){ this.user=null; this.cargado=false; this.errorCaja=null; data.ventas={}; data.gastos={}; data.ajustes=null; if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; },
   newId(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); },
   async put(coll,id,obj){ const body=Object.assign({},obj); delete body.id; const {error}=await sb.from(coll).upsert({id, data:body, updated_at:new Date().toISOString()}); if(error) throw error; data[coll][id]=Object.assign({},body,{id}); render(); },
   async del(coll,id){ const {error}=await sb.from(coll).delete().eq('id',id); if(error) throw error; delete data[coll][id]; render(); },
@@ -659,7 +664,7 @@ const acciones={
   reintentar(){ Store.cargar(); },
   'exportar-mes'(){ exportarMes(); },
   'exportar-json'(){ guardarArchivo('Respaldo ventas MiraKel '+hoyISO()+'.json', new Blob([JSON.stringify({version:1, app:'ventas', exportado:new Date().toISOString(), ventas:data.ventas, gastos:data.gastos},null,1)],{type:'application/json'})); },
-  async salir(){ try{ await sb.auth.signOut(); }catch(e){} data.ventas={}; data.gastos={}; data.ajustes=null; Store.cargado=false; mostrarLogin(); }
+  async salir(){ try{ await sb.auth.signOut(); }catch(e){} Store.limpiar(); mostrarLogin(); }
 };
 document.addEventListener('click', e=>{
   const el=e.target.closest('[data-act]'); if(!el) return; const fn=acciones[el.dataset.act]; if(!fn) return;
