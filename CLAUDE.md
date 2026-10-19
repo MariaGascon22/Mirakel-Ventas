@@ -7,7 +7,8 @@
 - Escribe los PR y las respuestas en español.
 
 ## Proyecto
-- App estática sin compilación: `index.html` (HTML, CSS y JS en un solo archivo), `sw.js` (service worker), `vendor/supabase.js`.
-- Los datos están en Supabase (tablas `ventas` y `gastos`, protegidas con RLS). La misma base la usa la app de apartados.
-- Con cada cambio que se publique, sube `APP_VERSION` y `APP_FECHA` en `index.html` (se muestran al final de Ajustes): el último número para correcciones, el de en medio para funciones nuevas.
-- Si cambias archivos que el service worker guarda en caché (`ARCHIVOS` en `sw.js`), sube `VERSION` en `sw.js` para que los teléfonos descarguen la versión nueva.
+- App estática sin compilación ni servidor: `index.html` (HTML, CSS y JS en un solo archivo), `sw.js` (service worker), `version.js`.
+- No usa Supabase ni ninguna base de datos: ventas, gastos y ajustes se guardan en `localStorage` del dispositivo. El respaldo JSON (Ajustes) es la única forma de pasarlos a otro dispositivo.
+- Usuarios en `USUARIOS` (`index.html`): la contraseña se guarda como huella SHA-256 de `mirakel-ventas|<usuario en minúsculas>|<contraseña>`, nunca en texto.
+- Con cada cambio que se publique, sube `APP_VERSION` y `APP_FECHA` en `version.js` (se muestran al final de Ajustes): el último número para correcciones, el de en medio para funciones nuevas. Ese cambio es el que hace que los teléfonos muestren el aviso de nueva versión.
+- Si agregas archivos que la app necesita sin internet, agrégalos a `ARCHIVOS` en `sw.js`.
