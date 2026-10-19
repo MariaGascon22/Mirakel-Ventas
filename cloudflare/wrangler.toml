@@ -1,0 +1,17 @@
+# Configuración para publicar el Worker con la terminal (npx wrangler deploy).
+# Si lo publicas desde el panel de Cloudflare no necesitas este archivo: sigue cloudflare/README.md.
+name = "mirakel-ventas"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ORIGEN = "https://mariagascon22.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mirakel-ventas"
+database_id = "PEGA_AQUI_EL_ID_DE_LA_BASE_D1"
+
+# Secretos (no van en este archivo):
+#   npx wrangler secret put USUARIOS      -> {"karina":{"nombre":"Karina","huella":"..."}}
+#   npx wrangler secret put TOKEN_SECRET  -> texto largo al azar

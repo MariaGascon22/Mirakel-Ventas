@@ -6,7 +6,7 @@ App de ventas, gastos y resumen del mes de MiraKel Accesorios.
 - **Gastos:** tipo (Empaques, Joyería, Insumo Café), monto y método de pago.
 - **Resumen:** utilidad, margen, ventas por día, por método y por lugar, y gastos por tipo.
 
-Se entra con usuario y contraseña (la lista está en `USUARIOS`, en `index.html`). Las ventas, gastos y ajustes se guardan solo en el dispositivo; usa **Ajustes → Descargar respaldo** seguido y **Importar respaldo** para pasarlos a otro teléfono.
+Se entra con usuario y contraseña. Las ventas, gastos y ajustes se guardan en el teléfono y se suben solos a Cloudflare (Worker + base D1), así que se ven en todos los dispositivos; sin internet se sigue trabajando y los cambios se suben al volver la conexión. La configuración de Cloudflare está en [`cloudflare/README.md`](cloudflare/README.md).
 
 Cuando se publica una versión nueva (cambia `version.js`), la app muestra un aviso para actualizar.
 

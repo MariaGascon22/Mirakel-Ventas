@@ -125,6 +125,9 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em}
 .tab[aria-current="page"]{background:var(--deep);color:#fff;box-shadow:0 8px 16px -8px var(--deep)}
 .icon-btn.gear{width:40px;height:40px;border-radius:50%;border:1px solid var(--glass-line);background:var(--glass);justify-content:center;align-items:center;color:var(--deep)}
 .icon-btn.gear[aria-current="page"]{background:var(--deep);color:#fff}
+.nube{font-size:11.5px;font-weight:700;color:var(--muted);background:var(--glass);border:1px solid var(--glass-line);border-radius:999px;padding:6px 11px;white-space:nowrap}
+.nube.ok{color:var(--up)}
+.nube.warn{color:var(--down);background:var(--down-bg);border-color:transparent}
 
 /* Botones */
 .btn{border-color:var(--glass-line);background:var(--glass);color:var(--deep);font-weight:600}
@@ -325,6 +328,7 @@ div.t-mv{cursor:default}
       <button class="tab" data-act="nav" data-view="ventas">Ventas</button>
       <button class="tab" data-act="nav" data-view="gastos">Gastos</button>
     </nav>
+    <span class="nube" id="nube" role="status" hidden></span>
     <button class="icon-btn gear" data-act="nav" data-view="ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
   <div id="banner"></div>
@@ -371,9 +375,13 @@ const data={ ventas:{}, gastos:{}, clientas:{}, cuentas:{}, ajustes:null };
 const ui={ view:'resumen', mes:hoyISO().slice(0,7), sheet:false };
 function aj(){ return Object.assign({ meta:0 }, data.ajustes||{}); }
 
-/* ============ Usuarios y datos ============
-   No hay servidor: las ventas, gastos y ajustes se guardan en este dispositivo (localStorage).
-   Las contraseñas no se guardan en texto: se compara su huella SHA-256 de "mirakel-ventas|usuario|contraseña". */
+/* ============ Usuarios, datos y nube ============
+   Los datos se guardan primero en este dispositivo (localStorage). Si NUBE_URL tiene la dirección del Worker
+   de Cloudflare, cada cambio se sube solo a la nube (D1) y se bajan los cambios hechos en otros dispositivos.
+   Sin internet se sigue trabajando: los cambios quedan pendientes y se suben al volver la conexión. */
+const NUBE_URL=''; /* p. ej. 'https://mirakel-ventas.<tu-cuenta>.workers.dev' (ver cloudflare/README.md) */
+/* Solo se usan mientras no haya nube; con nube, el Worker revisa usuario y contraseña.
+   La huella es SHA-256 de "mirakel-ventas|usuario|contraseña". */
 const USUARIOS=[
   { usuario:'karina', nombre:'Karina', huella:'36cb81a916299a755b2f75885800bcb4e17ec7e71354cfb2c8579024aa9e5150' }
 ];
@@ -389,35 +397,93 @@ function explicarError(e){
   if(e&&(e.name==='QuotaExceededError'||/quota/i.test(m))) return 'El teléfono no tiene espacio para guardar. Descarga un respaldo y libera espacio.';
   return 'No se pudo guardar: '+m;
 }
+/* Un cambio para la nube: datos null = registro eliminado. "editado" decide cuál gana si dos dispositivos cambian lo mismo. */
+function cambio(coleccion,id,datos,editado){ let d=null; if(datos){ d=Object.assign({},datos); delete d.id; } return {coleccion, id, datos:d, editado:editado||Date.now()}; }
+function aplicarCambio(c){
+  if(c.coleccion==='ajustes'){ data.ajustes=c.datos; return; }
+  if(!data[c.coleccion]) return;
+  if(c.datos) data[c.coleccion][c.id]=Object.assign({},c.datos,{id:c.id}); else delete data[c.coleccion][c.id];
+}
 const Store={
-  user:null, cargado:false,
+  user:null, cargado:false, pendientes:[], subidaInicial:false,
   init(){
     try{ Object.keys(localStorage).filter(k=>/^mirakel-ventas-auth/.test(k)||/^sb-/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){} /* sesión vieja de Supabase */
     if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-    const s=leerLS(CLAVE_SESION), u=s&&usuarioDe(s.usuario);
+    const s=leerLS(CLAVE_SESION), u=NUBE_URL ? (s&&s.token?s:null) : (s&&usuarioDe(s.usuario));
     if(u){ this.user=u; mostrarApp(); this.cargar(); } else mostrarLogin();
   },
-  entrar(u){ this.user=u; try{ localStorage.setItem(CLAVE_SESION, JSON.stringify({usuario:u.usuario})); }catch(e){} mostrarApp(); this.cargar(); },
-  cargar(){ const d=leerLS(CLAVE_DATOS)||{}; data.ventas=d.ventas||{}; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null; this.cargado=true; render(); },
-  guardar(){ localStorage.setItem(CLAVE_DATOS, JSON.stringify({version:1, ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes})); },
-  /* Aplica un cambio y lo guarda; si no se pudo guardar, deja los datos como estaban. */
-  cambiar(fn){
-    const antes={ventas:Object.assign({},data.ventas), gastos:Object.assign({},data.gastos), ajustes:data.ajustes};
-    try{ fn(); this.guardar(); }catch(e){ Object.assign(data,antes); throw e; }
-    render();
+  entrar(u){ this.user=u; try{ localStorage.setItem(CLAVE_SESION, JSON.stringify(u)); }catch(e){} mostrarApp(); this.cargar(); },
+  cargar(){
+    const d=leerLS(CLAVE_DATOS)||{};
+    data.ventas=d.ventas||{}; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null;
+    this.pendientes=Array.isArray(d.pendientes)?d.pendientes:[]; this.subidaInicial=!!d.subidaInicial;
+    if(NUBE_URL && !this.subidaInicial){ /* primera vez con nube en este dispositivo: sube lo que ya tenía guardado */
+      const L=[]; ['ventas','gastos'].forEach(c=>Object.values(data[c]).forEach(o=>L.push(cambio(c,o.id,o,o.editada||Date.parse(o.creada)||1))));
+      if(data.ajustes) L.push(cambio('ajustes','ventas',data.ajustes,1));
+      this.pendientes=L.concat(this.pendientes); this.subidaInicial=true; try{ this.guardar(); }catch(e){}
+    }
+    this.cargado=true; render(); Nube.sincronizar();
   },
-  limpiar(){ this.user=null; this.cargado=false; data.ventas={}; data.gastos={}; data.ajustes=null; try{ localStorage.removeItem(CLAVE_SESION); }catch(e){} if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; },
+  guardar(){ localStorage.setItem(CLAVE_DATOS, JSON.stringify({version:1, ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes, pendientes:this.pendientes, subidaInicial:this.subidaInicial})); },
+  /* Aplica los cambios, los guarda en el dispositivo y los manda a la nube; si no se pudo guardar, deja todo como estaba. */
+  cambiar(L){
+    const antes={ventas:Object.assign({},data.ventas), gastos:Object.assign({},data.gastos), ajustes:data.ajustes}, pend=this.pendientes;
+    try{ L.forEach(aplicarCambio); if(NUBE_URL) this.pendientes=pend.concat(L); this.guardar(); }
+    catch(e){ Object.assign(data,antes); this.pendientes=pend; throw e; }
+    render(); Nube.sincronizar();
+  },
+  limpiar(){ this.user=null; this.cargado=false; this.pendientes=[]; data.ventas={}; data.gastos={}; data.ajustes=null; try{ localStorage.removeItem(CLAVE_SESION); }catch(e){} if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; pintarNube(); },
   newId(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); },
-  async put(coll,id,obj){ this.cambiar(()=>{ data[coll][id]=Object.assign({},obj,{id}); }); },
-  async del(coll,id){ this.cambiar(()=>{ delete data[coll][id]; }); },
-  async putAjustes(obj){ this.cambiar(()=>{ data.ajustes=obj; }); },
+  async put(coll,id,obj){ const t=Date.now(); this.cambiar([cambio(coll,id,Object.assign({},obj,{editada:t}),t)]); },
+  async del(coll,id){ this.cambiar([cambio(coll,id,null)]); },
+  async putAjustes(obj){ this.cambiar([cambio('ajustes','ventas',obj)]); },
   async importar(r){
     const filas=(coll)=>Object.entries((r[coll]&&!Array.isArray(r[coll]))?r[coll]:{}).filter(([,o])=>o&&typeof o==='object');
-    const v=filas('ventas'), g=filas('gastos');
-    this.cambiar(()=>{ v.forEach(([id,o])=>{ data.ventas[id]=Object.assign({},o,{id}); }); g.forEach(([id,o])=>{ data.gastos[id]=Object.assign({},o,{id}); }); if(r.ajustes&&typeof r.ajustes==='object') data.ajustes=r.ajustes; });
+    const v=filas('ventas'), g=filas('gastos'), t=Date.now();
+    const L=v.map(([id,o])=>cambio('ventas',id,o,t)).concat(g.map(([id,o])=>cambio('gastos',id,o,t)));
+    if(r.ajustes&&typeof r.ajustes==='object') L.push(cambio('ajustes','ventas',r.ajustes,t));
+    this.cambiar(L);
     return {ventas:v.length, gastos:g.length};
   }
 };
+/* Sincronización con Cloudflare: manda los cambios pendientes y recibe todos los datos actuales. */
+const Nube={
+  ultima:0, error:'', ocupada:null, repetir:false,
+  activa(){ return !!(NUBE_URL && Store.user && Store.user.token); },
+  sincronizar(){
+    if(!this.activa()) return Promise.resolve();
+    if(this.ocupada){ this.repetir=true; return this.ocupada; }
+    this.ocupada=(async()=>{ do{ this.repetir=false; await this.una(); }while(this.repetir && this.activa()); })().finally(()=>{ this.ocupada=null; pintarNube(); });
+    pintarNube(); return this.ocupada;
+  },
+  async una(){
+    const envio=Store.pendientes.slice(), token=Store.user.token; let r, d=null;
+    try{ r=await fetch(NUBE_URL.replace(/\/+$/,'')+'/sync',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({cambios:envio})}); }
+    catch(e){ this.error='sin-internet'; return; }
+    if(!Store.user || Store.user.token!==token) return; /* cerró sesión mientras tanto */
+    if(r.status===401){ this.error=''; Store.limpiar(); mostrarLogin(); toast('Tu sesión venció. Vuelve a entrar.'); return; }
+    try{ d=await r.json(); }catch(e){}
+    if(!r.ok||!d||!d.ventas){ this.error=(d&&d.error)||('Error '+r.status); return; }
+    Store.pendientes=Store.pendientes.slice(envio.length);
+    data.ventas=d.ventas; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null;
+    Store.pendientes.forEach(aplicarCambio); /* lo que se registró mientras se subía */
+    try{ Store.guardar(); }catch(e){}
+    this.ultima=Date.now(); this.error=''; render();
+  }
+};
+function pintarNube(){
+  const el=$('#nube'); if(!el) return;
+  if(!Nube.activa()){ el.hidden=true; return; }
+  const n=Store.pendientes.length; let t='Guardado', c='ok';
+  if(Nube.ocupada){ t='Guardando…'; c=''; }
+  else if(Nube.error==='sin-internet'){ t=n?'Sin internet · '+n+' sin subir':'Sin internet'; c='warn'; }
+  else if(Nube.error){ t='Error al guardar en la nube'; c='warn'; }
+  else if(n){ t=n+' sin subir'; c=''; }
+  el.textContent=t; el.className='nube'+(c?' '+c:''); el.title=Nube.error&&Nube.error!=='sin-internet'?Nube.error:''; el.hidden=false;
+}
+window.addEventListener('online', ()=>Nube.sincronizar());
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Nube.sincronizar(); });
+setInterval(()=>{ if(!document.hidden) Nube.sincronizar(); }, 60000);
 function mostrarLogin(){ $('#app-shell').hidden=true; $('#login').hidden=false; setTimeout(()=>{ const e=$('#l-user'); if(e) e.focus(); },50); }
 function mostrarApp(){ $('#login').hidden=true; $('#app-shell').hidden=false; }
 
@@ -620,7 +686,7 @@ function vAjustes(){
   let h='<div class="t-phead"><div class="t-ttl"><h1>Ajustes</h1><p>Tu meta, tus datos y tu cuenta</p></div></div>';
   h+='<form id="f-ajustes" class="t-card" novalidate style="display:grid;gap:14px"><h2 style="font-size:17px">Meta de ventas del mes</h2><div class="field"><label for="a-meta">Meta en pesos</label><input id="a-meta" type="number" min="0" step="100" inputmode="numeric" placeholder="Ej. 20000" value="'+(Number(A.meta)>0?esc(A.meta):'')+'"><span class="help">Se muestra como barra de avance en Resumen. Déjalo vacío si no quieres meta.</span></div><div class="actions" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">Guardar meta</button></div></form>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Respaldo</h2><p class="lead">Descarga todas tus ventas y gastos en un archivo. Guárdalo en tu Drive o mándatelo por correo. Con “Importar respaldo” lo recuperas.</p><div class="actions"><button type="button" class="btn" data-act="exportar-json">'+ICON.dl+'Descargar respaldo</button><label class="btn" for="imp-json">Importar respaldo</label><input id="imp-json" type="file" accept=".json,application/json" hidden><button type="button" class="btn" data-act="exportar-mes">'+ICON.dl+'Excel del mes</button></div></section>';
-  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.nombre||'')+'</b>. Tus ventas y gastos se guardan solo en este dispositivo: descarga un respaldo seguido para no perderlos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
+  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.nombre||'')+'</b>. '+(NUBE_URL?'Tus ventas y gastos se guardan solos en la nube y se ven en todos los dispositivos donde entres.':'Tus ventas y gastos se guardan solo en este dispositivo: descarga un respaldo seguido para no perderlos.')+'</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
   h+='<p class="t-version num">MiraKel Ventas · versión '+esc(window.APP_VERSION||'')+' · '+fCorta(window.APP_FECHA)+'</p>';
   return h;
 }
@@ -629,6 +695,7 @@ function vAjustes(){
 let pend=false;
 function render(){ if(pend) return; pend=true; requestAnimationFrame(()=>{ pend=false; renderNow(); }); }
 function renderNow(){
+  pintarNube();
   document.querySelectorAll('[data-act="nav"]').forEach(b=>{ if(b.dataset.view===ui.view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
   if(!Store.cargado) return;
   const main=$('#main');
@@ -673,11 +740,21 @@ document.getElementById('f-login').addEventListener('submit', async ev=>{
   const usuario=$('#l-user').value.trim(), password=$('#l-pass').value, msg=$('#l-err'), btn=$('#l-btn');
   if(!usuario||!password){ msg.textContent='Escribe tu usuario y tu contraseña.'; msg.hidden=false; return; }
   btn.disabled=true; btn.textContent='Entrando…'; msg.hidden=true;
+  const fallo=(t)=>{ btn.disabled=false; btn.textContent='Entrar'; msg.textContent=t; msg.hidden=false; };
+  if(NUBE_URL){
+    let r, d=null;
+    try{ r=await fetch(NUBE_URL.replace(/\/+$/,'')+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario,password})}); d=await r.json().catch(()=>null); }
+    catch(e){ return fallo('Sin conexión a internet. Para entrar necesitas internet.'); }
+    if(r.status===401) return fallo('Usuario o contraseña incorrectos.');
+    if(!r.ok||!d||!d.token) return fallo('No se pudo entrar: '+((d&&d.error)||'error '+r.status));
+    btn.disabled=false; btn.textContent='Entrar'; $('#l-pass').value='';
+    Store.entrar({usuario:d.usuario, nombre:d.nombre, token:d.token});
+    return;
+  }
   const u=usuarioDe(usuario); let ok=false;
   try{ ok=!!u && (await huella(u.usuario,password))===u.huella; }catch(e){ console.error(e); }
-  btn.disabled=false; btn.textContent='Entrar';
-  if(!ok){ msg.textContent='Usuario o contraseña incorrectos.'; msg.hidden=false; return; }
-  $('#l-pass').value=''; Store.entrar(u);
+  if(!ok) return fallo('Usuario o contraseña incorrectos.');
+  btn.disabled=false; btn.textContent='Entrar'; $('#l-pass').value=''; Store.entrar(u);
 });
 document.addEventListener('submit', async e=>{
   const f=e.target; if(f.id==='f-login') return;
