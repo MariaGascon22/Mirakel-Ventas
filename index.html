@@ -280,6 +280,7 @@ div.t-mv{cursor:default}
 .t-dayh small{display:block;font-size:11px;font-weight:600}
 .t-empty{text-align:center;display:grid;justify-items:center;gap:10px;padding:32px 20px;margin-top:18px;color:var(--muted)}
 .t-empty h2{color:var(--ink);font-size:20px}
+.t-version{text-align:center;font-size:12px;color:var(--muted);margin-top:22px}
 .t-feebox{margin:0;background:var(--a-soft-2);border:1px dashed var(--a1);border-radius:14px;padding:10px 12px;font-size:13px}
 .t-amount{font-size:24px!important;font-weight:700;letter-spacing:-.02em}
 .field label,.lbl{text-transform:none;letter-spacing:0;font-size:12px;font-weight:700;color:var(--muted)}
@@ -444,6 +445,8 @@ const METODOS=['Efectivo','Transferencia','Tarjeta','Otro'];
 const ARTICULOS=['Aretes','Collar','Pulsera','Reloj','Anillo','Café'];
 const LUGARES=['DIF','Bazar','Boutique','Otro'];
 const TIPOS_GASTO=['Empaques','Joyería','Insumo Café'];
+/* Versión de la app que se muestra en Ajustes: súbela con cada cambio que se publique. */
+const APP_VERSION='1.3.0', APP_FECHA='2026-10-19';
 const COMISION_TARJETA=0.045; /* lo que cobra la terminal: se resta de cada venta con tarjeta */
 const SQL_CAJA="create table ventas (\n  id text primary key,\n  data jsonb not null,\n  owner uuid not null default auth.uid() references auth.users,\n  updated_at timestamptz not null default now()\n);\ncreate table gastos (\n  id text primary key,\n  data jsonb not null,\n  owner uuid not null default auth.uid() references auth.users,\n  updated_at timestamptz not null default now()\n);\n\nalter table ventas enable row level security;\nalter table gastos enable row level security;\n\ncreate policy \"Solo la duena\" on ventas for all\n  using (owner = auth.uid()) with check (owner = auth.uid());\ncreate policy \"Solo la duena\" on gastos for all\n  using (owner = auth.uid()) with check (owner = auth.uid());";
 const DIAS_SEM=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
@@ -635,6 +638,7 @@ function vAjustes(){
   h+='<form id="f-ajustes" class="t-card" novalidate style="display:grid;gap:14px"><h2 style="font-size:17px">Meta de ventas del mes</h2><div class="field"><label for="a-meta">Meta en pesos</label><input id="a-meta" type="number" min="0" step="100" inputmode="numeric" placeholder="Ej. 20000" value="'+(Number(A.meta)>0?esc(A.meta):'')+'"><span class="help">Se muestra como barra de avance en Resumen. Déjalo vacío si no quieres meta.</span></div><div class="actions" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">Guardar meta</button></div></form>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Respaldo</h2><p class="lead">Descarga todas tus ventas y gastos en un archivo. Guárdalo en tu Drive o mándatelo por correo. Con “Importar respaldo” lo recuperas.</p><div class="actions"><button type="button" class="btn" data-act="exportar-json">'+ICON.dl+'Descargar respaldo</button><label class="btn" for="imp-json">Importar respaldo</label><input id="imp-json" type="file" accept=".json,application/json" hidden><button type="button" class="btn" data-act="exportar-mes">'+ICON.dl+'Excel del mes</button></div></section>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(usuarioDeCorreo(Store.user&&Store.user.email))+'</b>. Solo las usuarias autorizadas pueden ver estos datos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
+  h+='<p class="t-version num">MiraKel Ventas · versión '+APP_VERSION+' · '+fCorta(APP_FECHA)+'</p>';
   return h;
 }
 
