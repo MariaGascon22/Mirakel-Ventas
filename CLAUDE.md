@@ -9,4 +9,5 @@
 ## Proyecto
 - App estática sin compilación: `index.html` (HTML, CSS y JS en un solo archivo), `sw.js` (service worker), `vendor/supabase.js`.
 - Los datos están en Supabase (tablas `ventas` y `gastos`, protegidas con RLS). La misma base la usa la app de apartados.
+- Con cada cambio que se publique, sube `APP_VERSION` y `APP_FECHA` en `index.html` (se muestran al final de Ajustes): el último número para correcciones, el de en medio para funciones nuevas.
 - Si cambias archivos que el service worker guarda en caché (`ARCHIVOS` en `sw.js`), sube `VERSION` en `sw.js` para que los teléfonos descarguen la versión nueva.
