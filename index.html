@@ -304,12 +304,11 @@ div.t-mv{cursor:default}
     <span class="firma" role="img" aria-label="MiraKel"></span>
     <span class="eyebrow">Ventas</span>
     <form id="f-login" novalidate>
-      <div class="field"><label for="l-email">Correo</label><input id="l-email" type="email" autocomplete="username" inputmode="email"></div>
+      <div class="field"><label for="l-user">Usuario</label><input id="l-user" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
       <div class="field"><label for="l-pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password"></div>
       <p class="err" id="l-err" hidden></p>
       <button class="btn btn-primary" id="l-btn" type="submit">Entrar</button>
     </form>
-    <p class="hint">Es el mismo correo y contraseña de tu app de apartados.</p>
   </div>
 </div>
 
@@ -389,6 +388,11 @@ async function todasLasFilas(coll){
   const out=[], N=1000;
   for(let i=0;;){ const {data:rows,error}=await sb.from(coll).select('id,data').order('id').range(i,i+N-1); if(error) throw error; if(!rows||!rows.length) return out; out.push(...rows); i+=rows.length; }
 }
+/* Se entra con usuario y contraseña; Supabase pide correo, así que el usuario se convierte en un correo interno.
+   Si se escribe un correo completo (con @), se usa tal cual. */
+const DOMINIO_USUARIOS='mirakel.app';
+function correoDeUsuario(u){ u=String(u||'').trim().toLowerCase(); return u.indexOf('@')>=0?u:u+'@'+DOMINIO_USUARIOS; }
+function usuarioDeCorreo(c){ c=String(c||''); const fin='@'+DOMINIO_USUARIOS; return c.toLowerCase().endsWith(fin)?c.slice(0,-fin.length):c; }
 function filasAMapa(rows){ const o={}; (rows||[]).forEach(r=>{ o[r.id]=Object.assign({}, r.data||{}, {id:r.id}); }); return o; }
 const Store={
   user:null, errorCaja:null, cargado:false, ultima:0,
@@ -418,7 +422,7 @@ const Store={
     await this.cargar(); return {ventas:v.length, gastos:g.length};
   }
 };
-function mostrarLogin(){ $('#app-shell').hidden=true; $('#login').hidden=false; setTimeout(()=>{ const e=$('#l-email'); if(e) e.focus(); },50); }
+function mostrarLogin(){ $('#app-shell').hidden=true; $('#login').hidden=false; setTimeout(()=>{ const e=$('#l-user'); if(e) e.focus(); },50); }
 function mostrarApp(){ $('#login').hidden=true; $('#app-shell').hidden=false; }
 
 /* ============ Hoja, avisos y archivos ============ */
@@ -630,7 +634,7 @@ function vAjustes(){
   let h='<div class="t-phead"><div class="t-ttl"><h1>Ajustes</h1><p>Tu meta, tus datos y tu cuenta</p></div></div>';
   h+='<form id="f-ajustes" class="t-card" novalidate style="display:grid;gap:14px"><h2 style="font-size:17px">Meta de ventas del mes</h2><div class="field"><label for="a-meta">Meta en pesos</label><input id="a-meta" type="number" min="0" step="100" inputmode="numeric" placeholder="Ej. 20000" value="'+(Number(A.meta)>0?esc(A.meta):'')+'"><span class="help">Se muestra como barra de avance en Resumen. Déjalo vacío si no quieres meta.</span></div><div class="actions" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">Guardar meta</button></div></form>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Respaldo</h2><p class="lead">Descarga todas tus ventas y gastos en un archivo. Guárdalo en tu Drive o mándatelo por correo. Con “Importar respaldo” lo recuperas.</p><div class="actions"><button type="button" class="btn" data-act="exportar-json">'+ICON.dl+'Descargar respaldo</button><label class="btn" for="imp-json">Importar respaldo</label><input id="imp-json" type="file" accept=".json,application/json" hidden><button type="button" class="btn" data-act="exportar-mes">'+ICON.dl+'Excel del mes</button></div></section>';
-  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.email||'')+'</b>. Solo tu usuario puede ver estos datos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
+  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(usuarioDeCorreo(Store.user&&Store.user.email))+'</b>. Solo las usuarias autorizadas pueden ver estos datos.</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
   return h;
 }
 
@@ -682,12 +686,12 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && Store
 /* ============ Formularios ============ */
 document.getElementById('f-login').addEventListener('submit', async ev=>{
   ev.preventDefault();
-  const email=$('#l-email').value.trim(), password=$('#l-pass').value, msg=$('#l-err'), btn=$('#l-btn');
-  if(!email||!password){ msg.textContent='Escribe tu correo y tu contraseña.'; msg.hidden=false; return; }
+  const usuario=$('#l-user').value.trim(), password=$('#l-pass').value, msg=$('#l-err'), btn=$('#l-btn');
+  if(!usuario||!password){ msg.textContent='Escribe tu usuario y tu contraseña.'; msg.hidden=false; return; }
   btn.disabled=true; btn.textContent='Entrando…'; msg.hidden=true;
-  const {data:res, error}=await sb.auth.signInWithPassword({email,password});
+  const {data:res, error}=await sb.auth.signInWithPassword({email:correoDeUsuario(usuario),password});
   btn.disabled=false; btn.textContent='Entrar';
-  if(error){ const m=String(error.message||''); msg.textContent=/Invalid login/i.test(m)?'Correo o contraseña incorrectos.':/Failed to fetch|Load failed|NetworkError/i.test(m)?'Sin conexión a internet. Revisa tu señal.':'No se pudo entrar: '+m; msg.hidden=false; return; }
+  if(error){ const m=String(error.message||''); msg.textContent=/Invalid login/i.test(m)?'Usuario o contraseña incorrectos.':/Failed to fetch|Load failed|NetworkError/i.test(m)?'Sin conexión a internet. Revisa tu señal.':'No se pudo entrar: '+m; msg.hidden=false; return; }
   Store.user=res.user; $('#l-pass').value=''; mostrarApp(); await Store.cargar();
 });
 document.addEventListener('submit', async e=>{
