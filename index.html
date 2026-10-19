@@ -416,7 +416,7 @@ const Store={
   cargar(){
     const d=leerLS(CLAVE_DATOS)||{};
     data.ventas=d.ventas||{}; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null;
-    this.pendientes=Array.isArray(d.pendientes)?d.pendientes:[]; this.subidaInicial=!!d.subidaInicial;
+    this.pendientes=Array.isArray(d.pendientes)?d.pendientes:[]; this.subidaInicial=!!d.subidaInicial; Nube.ultima=Number(d.ultimoGuardado)||0;
     if(NUBE_URL && !this.subidaInicial){ /* primera vez con nube en este dispositivo: sube lo que ya tenía guardado */
       const L=[]; ['ventas','gastos'].forEach(c=>Object.values(data[c]).forEach(o=>L.push(cambio(c,o.id,o,o.editada||Date.parse(o.creada)||1))));
       if(data.ajustes) L.push(cambio('ajustes','ventas',data.ajustes,1));
@@ -424,7 +424,7 @@ const Store={
     }
     this.cargado=true; render(); Nube.sincronizar();
   },
-  guardar(){ localStorage.setItem(CLAVE_DATOS, JSON.stringify({version:1, ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes, pendientes:this.pendientes, subidaInicial:this.subidaInicial})); },
+  guardar(){ localStorage.setItem(CLAVE_DATOS, JSON.stringify({version:1, ventas:data.ventas, gastos:data.gastos, ajustes:data.ajustes, pendientes:this.pendientes, subidaInicial:this.subidaInicial, ultimoGuardado:Nube.ultima||0})); },
   /* Aplica los cambios, los guarda en el dispositivo y los manda a la nube; si no se pudo guardar, deja todo como estaba. */
   cambiar(L){
     const antes={ventas:Object.assign({},data.ventas), gastos:Object.assign({},data.gastos), ajustes:data.ajustes}, pend=this.pendientes;
@@ -432,7 +432,7 @@ const Store={
     catch(e){ Object.assign(data,antes); this.pendientes=pend; throw e; }
     render(); Nube.sincronizar();
   },
-  limpiar(){ this.user=null; this.cargado=false; this.pendientes=[]; data.ventas={}; data.gastos={}; data.ajustes=null; try{ localStorage.removeItem(CLAVE_SESION); }catch(e){} if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; pintarNube(); },
+  limpiar(){ this.user=null; this.cargado=false; this.pendientes=[]; Nube.ultima=0; data.ventas={}; data.gastos={}; data.ajustes=null; try{ localStorage.removeItem(CLAVE_SESION); }catch(e){} if(ui.sheet) cerrarHoja(); $('#main').innerHTML='<div class="skel"></div><div class="skel" style="height:240px"></div>'; delete $('#main').dataset.view; pintarNube(); },
   newId(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); },
   async put(coll,id,obj){ const t=Date.now(); this.cambiar([cambio(coll,id,Object.assign({},obj,{editada:t}),t)]); },
   async del(coll,id){ this.cambiar([cambio(coll,id,null)]); },
@@ -467,19 +467,31 @@ const Nube={
     Store.pendientes=Store.pendientes.slice(envio.length);
     data.ventas=d.ventas; data.gastos=d.gastos||{}; data.ajustes=d.ajustes||null;
     Store.pendientes.forEach(aplicarCambio); /* lo que se registró mientras se subía */
+    this.ultima=Date.now(); this.error='';
     try{ Store.guardar(); }catch(e){}
-    this.ultima=Date.now(); this.error=''; render();
+    render();
   }
 };
+/* "2:45 p. m." si fue hoy, "ayer 2:45 p. m." o "18 oct 2:45 p. m." si fue antes. */
+function cuandoGuardado(ms){
+  if(!ms) return '';
+  const f=new Date(ms), hoy=new Date(), ayer=new Date(); ayer.setDate(hoy.getDate()-1);
+  const hora=f.toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit'});
+  if(f.toDateString()===hoy.toDateString()) return hora;
+  if(f.toDateString()===ayer.toDateString()) return 'ayer '+hora;
+  return f.toLocaleDateString('es-MX',{day:'numeric',month:'short'}).replace('.','')+' '+hora;
+}
+function textoUltimoGuardado(){ return Nube.ultima?'Última vez guardado en la nube: '+cuandoGuardado(Nube.ultima):'Todavía no se ha guardado en la nube desde este dispositivo.'; }
 function pintarNube(){
   const el=$('#nube'); if(!el) return;
   if(!Nube.activa()){ el.hidden=true; return; }
-  const n=Store.pendientes.length; let t='Guardado', c='ok';
+  const n=Store.pendientes.length, cuando=cuandoGuardado(Nube.ultima); let t=cuando?'Guardado '+cuando:'Guardado', c='ok';
   if(Nube.ocupada){ t='Guardando…'; c=''; }
   else if(Nube.error==='sin-internet'){ t=n?'Sin internet · '+n+' sin subir':'Sin internet'; c='warn'; }
   else if(Nube.error){ t='Error al guardar en la nube'; c='warn'; }
   else if(n){ t=n+' sin subir'; c=''; }
-  el.textContent=t; el.className='nube'+(c?' '+c:''); el.title=Nube.error&&Nube.error!=='sin-internet'?Nube.error:''; el.hidden=false;
+  el.textContent=t; el.className='nube'+(c?' '+c:''); el.title=(Nube.error&&Nube.error!=='sin-internet'?Nube.error+' · ':'')+(cuando?'Último guardado en la nube: '+cuando:''); el.hidden=false;
+  const u=$('#ultimo-guardado'); if(u) u.textContent=textoUltimoGuardado();
 }
 window.addEventListener('online', ()=>Nube.sincronizar());
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Nube.sincronizar(); });
@@ -686,7 +698,7 @@ function vAjustes(){
   let h='<div class="t-phead"><div class="t-ttl"><h1>Ajustes</h1><p>Tu meta, tus datos y tu cuenta</p></div></div>';
   h+='<form id="f-ajustes" class="t-card" novalidate style="display:grid;gap:14px"><h2 style="font-size:17px">Meta de ventas del mes</h2><div class="field"><label for="a-meta">Meta en pesos</label><input id="a-meta" type="number" min="0" step="100" inputmode="numeric" placeholder="Ej. 20000" value="'+(Number(A.meta)>0?esc(A.meta):'')+'"><span class="help">Se muestra como barra de avance en Resumen. Déjalo vacío si no quieres meta.</span></div><div class="actions" style="justify-content:flex-end"><button class="btn btn-primary" type="submit">Guardar meta</button></div></form>';
   h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Respaldo</h2><p class="lead">Descarga todas tus ventas y gastos en un archivo. Guárdalo en tu Drive o mándatelo por correo. Con “Importar respaldo” lo recuperas.</p><div class="actions"><button type="button" class="btn" data-act="exportar-json">'+ICON.dl+'Descargar respaldo</button><label class="btn" for="imp-json">Importar respaldo</label><input id="imp-json" type="file" accept=".json,application/json" hidden><button type="button" class="btn" data-act="exportar-mes">'+ICON.dl+'Excel del mes</button></div></section>';
-  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.nombre||'')+'</b>. '+(NUBE_URL?'Tus ventas y gastos se guardan solos en la nube y se ven en todos los dispositivos donde entres.':'Tus ventas y gastos se guardan solo en este dispositivo: descarga un respaldo seguido para no perderlos.')+'</p><div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
+  h+='<section class="t-card" style="margin-top:18px;display:grid;gap:12px"><h2 style="font-size:17px">Tu cuenta</h2><p class="lead">Entraste como <b>'+esc(Store.user&&Store.user.nombre||'')+'</b>. '+(NUBE_URL?'Tus ventas y gastos se guardan solos en la nube y se ven en todos los dispositivos donde entres.':'Tus ventas y gastos se guardan solo en este dispositivo: descarga un respaldo seguido para no perderlos.')+'</p>'+(NUBE_URL?'<p class="lead" id="ultimo-guardado">'+esc(textoUltimoGuardado())+'</p>':'')+'<div class="actions"><button type="button" class="btn btn-danger" data-act="salir">Cerrar sesión</button></div></section>';
   h+='<p class="t-version num">MiraKel Ventas · versión '+esc(window.APP_VERSION||'')+' · '+fCorta(window.APP_FECHA)+'</p>';
   return h;
 }
