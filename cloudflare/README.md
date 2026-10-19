@@ -26,7 +26,7 @@ Todo cabe en el plan gratuito de Cloudflare.
 4. **Usuarios y clave secreta** (Worker → **Settings → Variables and Secrets → Add**)
    - `USUARIOS` (tipo **Secret**):
      ```
-     {"karina":{"nombre":"Karina","huella":"36cb81a916299a755b2f75885800bcb4e17ec7e71354cfb2c8579024aa9e5150"}}
+     {"karina":{"nombre":"Karina","huella":"<huella de su contraseña>"}}
      ```
    - `TOKEN_SECRET` (tipo **Secret**): un texto largo al azar (por ejemplo, 40 letras y números). No lo compartas.
    - `ORIGEN` (tipo **Text**): `https://mariagascon22.github.io`
@@ -43,7 +43,7 @@ Edita el secreto `USUARIOS` en el Worker. La huella es el SHA-256 de `mirakel-ve
 Para calcularla en la consola del navegador:
 
 ```js
-crypto.subtle.digest('SHA-256', new TextEncoder().encode('mirakel-ventas|karina|Karinarazo'))
+crypto.subtle.digest('SHA-256', new TextEncoder().encode('mirakel-ventas|karina|CONTRASEÑA'))
   .then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('')))
 ```
 
