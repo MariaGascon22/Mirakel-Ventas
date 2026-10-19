@@ -13,9 +13,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="preload" href="fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/logo.webp" as="image">
 <style>
 /* Layout: encabezado con marca y pestañas; contenido en una columna (máx. 1180px) dentro de un panel de vidrio en computadora;
    barra inferior flotante en celular. Diseño claro a propósito. */
@@ -32,7 +31,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
 .brand-logo{width:46px;height:46px;border-radius:50%;flex:none}
 .brand-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
-.firma{display:block;width:120px;aspect-ratio:822/174;-webkit-mask:url("assets/firma.png") center/contain no-repeat;mask:url("assets/firma.png") center/contain no-repeat}
+.firma{display:block;width:120px;aspect-ratio:822/174;-webkit-mask:url("assets/firma.webp") center/contain no-repeat;mask:url("assets/firma.webp") center/contain no-repeat}
 .eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
 .tabs{display:flex}
 .tab{border:0;background:none;padding:9px 16px;border-radius:999px;cursor:pointer;font-size:13.5px}
@@ -87,6 +86,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 @keyframes sh{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* ================= Diseño tecnológico MiraKel (vidrio claro) ================= */
+@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:200 800;font-display:swap;src:url("fonts/plus-jakarta-sans.woff2") format("woff2")}
 :root{
   --bg:#F4EFF3; --surface:#FFFFFF; --blush:#F7DCEA; --blush-2:#FBEEF5; --rose:#D78BB1; --rose-deep:#6E3457; --rose-ink:#8E3F6C;
   --hot:#FC76B9; --mkl:#EBC2D7; --gold:#C2A36B; --kraft:#B48A5E; --ink:#2E2530; --muted:#8A7D86; --line:rgba(110,52,87,.10); --on-primary:#FFFFFF;
@@ -304,7 +304,7 @@ div.t-mv{cursor:default}
 <body>
 <div class="login" id="login" hidden>
   <div class="login-card">
-    <img src="assets/logo.png" alt="MiraKel Accesorios">
+    <img src="assets/logo.webp" alt="MiraKel Accesorios">
     <span class="firma" role="img" aria-label="MiraKel"></span>
     <span class="eyebrow">Ventas</span>
     <form id="f-login" novalidate>
@@ -320,7 +320,7 @@ div.t-mv{cursor:default}
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img class="brand-logo" src="assets/logo.png" alt="MiraKel Accesorios">
+      <img class="brand-logo" src="assets/logo.webp" alt="MiraKel Accesorios">
       <div class="brand-txt"><span class="firma" role="img" aria-label="MiraKel"></span><span class="eyebrow">Ventas</span></div>
     </div>
     <nav class="tabs" aria-label="Secciones">
@@ -353,7 +353,7 @@ div.t-mv{cursor:default}
 <script>
 (function(){
 "use strict";
-document.documentElement.style.setProperty('--wings-url','url("assets/wings.png")');
+document.documentElement.style.setProperty('--wings-url','url("assets/wings.webp")');
 /* ============ Utilidades ============ */
 const $=(s,el=document)=>el.querySelector(s);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
