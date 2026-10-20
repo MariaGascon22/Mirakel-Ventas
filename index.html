@@ -214,9 +214,10 @@ body[data-view="ventas"] .fondo-flores{display:block;--foto:url("assets/peonias.
 .t-fee{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:4px}
 .t-link{border:0;background:none;color:var(--deep);font-weight:700;font-size:12.5px;cursor:pointer;padding:0;text-decoration:underline}
 .t-vacio{color:var(--muted);font-size:13px}
-.t-g1{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr) minmax(0,1.08fr);gap:18px}
+.t-g1{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr) minmax(0,1.08fr);gap:18px;align-items:start}
 .t-stack{display:grid;gap:18px}
 .t-g2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:18px}
+.t-g2.t-uno{grid-template-columns:minmax(0,1fr)}
 .t-g3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
 @media (max-width:1000px){.t-g1{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.t-g1 .t-gauge-card{grid-column:1/-1}.t-g3{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.t-g1,.t-g2{grid-template-columns:minmax(0,1fr)}.t-g1 .t-gauge-card{grid-column:auto}}
@@ -606,15 +607,22 @@ let ultimaAnimSemana='';
 function vResumen(){
   const m=ui.mes, prev=mesMover(m,-1), n=numerosMes(m), p=numerosMes(prev), A=aj(), esAct=m===mesActual();
   const margen = n.ing>0 ? Math.round(n.util/n.ing*100) : 0;
-  const hoyN = esAct ? sumNeto(n.V.filter(v=>v.fecha===hoyISO())) : 0;
+  const hoy=hoyISO(), ayer=sumarDias(hoy,-1), todas=Object.values(data.ventas||{});
+  const hoyL=todas.filter(v=>v.fecha===hoy).sort((a,b)=>String(b.creada||'').localeCompare(String(a.creada||'')));
+  const hoyN=sumNeto(hoyL), ayerN=sumNeto(todas.filter(v=>v.fecha===ayer)), hoyP=hoyL.reduce((s,v)=>s+(Number(v.piezas)||1),0);
   let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta');
   h+='<div class="t-g1"><div class="t-stack">';
-  h+='<section class="t-card t-hero"><div class="t-ch"><h2>Utilidad del mes</h2></div><div class="t-big num">'+signo(n.util)+'</div><div class="t-krow">'+tchip(n.util,p.util)+'<span class="t-vs">'+(p.util?'vs '+esc(mesSolo(prev)):'Ingresos menos gastos')+'</span></div></section>';
+  h+='<section class="t-card t-hero"><div class="t-ch"><h2>Ventas de Hoy</h2></div><div class="t-big num">'+money(hoyN)+'</div><div class="t-krow">'+(hoyN>0?tchip(hoyN,ayerN):'')+'<span class="t-vs">'+(hoyN>0&&ayerN?'vs ayer':hoyL.length?hoyP+(hoyP===1?' artículo vendido hoy':' artículos vendidos hoy'):'Aún no hay ventas hoy')+'</span></div></section>';
   h+='</div>';
   const meta=Number(A.meta)||0, metaP=meta>0?Math.min(100,Math.round(n.v/meta*100)):0;
-  h+='<section class="t-card"><div class="t-ch"><h2>Ventas del mes</h2>'+(esAct&&hoyN>0?'<span class="t-chip up">+'+money(hoyN)+' hoy</span>':'')+'</div><div class="t-big num">'+money(n.v)+'</div>'+(n.comision>0?'<p class="t-fee">Cobrado '+money(n.cobrado)+' · comisión de terminal −'+money(n.comision)+'</p>':'<p class="t-fee">'+n.V.length+(n.V.length===1?' venta registrada':' ventas registradas')+'</p>')+
+  h+='<div class="t-stack"><section class="t-card"><div class="t-ch"><h2>Ventas del mes</h2>'+(esAct&&hoyN>0?'<span class="t-chip up">+'+money(hoyN)+' hoy</span>':'')+'</div><div class="t-big num">'+money(n.v)+'</div>'+(n.comision>0?'<p class="t-fee">Cobrado '+money(n.cobrado)+' · comisión de terminal −'+money(n.comision)+'</p>':'<p class="t-fee">'+n.V.length+(n.V.length===1?' venta registrada':' ventas registradas')+'</p>')+
      (meta>0?'<div class="t-meter" role="progressbar" aria-valuenow="'+metaP+'" aria-valuemin="0" aria-valuemax="100" aria-label="Avance de la meta"><i style="width:'+Math.max(metaP,2)+'%"></i></div><div class="t-mrow"><span><b>'+Math.round(n.v/meta*100)+'%</b> de tu meta</span><span>Meta <b class="num">'+money(meta)+'</b></span></div>'
        :'<div class="t-meter"><i style="width:0"></i></div><div class="t-mrow"><span>Ponle una meta mensual a tus ventas</span><button class="t-link" data-act="nav" data-view="ajustes">Definir meta</button></div>')+'</section>';
+  const MAX_HOY=6;
+  h+='<section class="t-card"><div class="t-ch"><h2>Artículos vendidos hoy</h2>'+(hoyL.length?'<span class="t-chip soft num">'+hoyP+(hoyP===1?' pieza':' piezas')+'</span>':'')+'</div>'+
+     (hoyL.length?'<div class="t-moves">'+hoyL.slice(0,MAX_HOY).map(v=>filaVenta(v,esc(metodoBase(v.metodo))+(v.lugar?' · '+esc(v.lugar):''))).join('')+'</div>'+
+       (hoyL.length>MAX_HOY?'<p class="t-mrow" style="margin-top:10px"><span>y '+(hoyL.length-MAX_HOY)+' más</span><button class="t-link" data-act="ver-hoy">Ver todas</button></p>':'')
+     :'<p class="t-vacio">Aún no hay ventas hoy.</p>')+'</section></div>';
   const gp = Math.max(0,Math.min(100,margen));
   h+='<section class="t-card t-gauge-card"><div class="t-ch"><h2>Margen de ganancia</h2></div><svg class="t-gauge" id="t-gauge" data-p="'+gp+'" viewBox="0 0 300 170" role="img" aria-label="Margen '+margen+'%"></svg><div class="t-gauge-c"><div class="t-big num">'+margen+'%</div><p>de cada peso que entra</p></div><div class="t-gauge-f"><span>Ingresos del mes <b class="num">'+money(n.ing)+'</b></span>'+tchip(n.ing,p.ing)+'</div></section>';
   h+='</div>';
@@ -623,13 +631,10 @@ function vResumen(){
   const sem=[0,0,0,0,0,0,0]; n.V.forEach(v=>{ const d=(new Date(v.fecha+'T12:00:00').getDay()+6)%7; sem[d]=r2(sem[d]+netoVenta(v)); });
   const max=Math.max(...sem), conV=sem.filter(x=>x>0), minV=conV.length>1?Math.min(...conV):-1, best=sem.indexOf(max);
   const claveAnim=m+'|'+sem.join(','), animar=claveAnim!==ultimaAnimSemana; ultimaAnimSemana=claveAnim;
-  h+='<div class="t-g2"><section class="t-card"><div class="t-ch"><div style="margin-right:auto;min-width:0"><h2>Últimos movimientos</h2><p class="t-sub">Los días de mayores ventas</p></div><span class="t-chip soft">'+esc(mesSolo(m))+'</span></div>';
+  h+='<div class="t-g2 t-uno"><section class="t-card"><div class="t-ch"><div style="margin-right:auto;min-width:0"><h2>Últimos movimientos</h2><p class="t-sub">Los días de mayores ventas</p></div><span class="t-chip soft">'+esc(mesSolo(m))+'</span></div>';
   if(max>0) h+='<div class="t-week"><div class="t-lead"><div class="t-big num">'+kmoney(max)+'</div><p>'+DIAS_LARGO[best].charAt(0).toUpperCase()+DIAS_LARGO[best].slice(1)+' son tus mejores días este mes</p></div><div class="t-bars'+(animar?' t-anim':'')+'">'+sem.map((x,i)=>'<div class="t-bcol'+(i===best?' top':x===minV?' low':'')+'" style="--i:'+i+'"><span class="v num">'+(x>0?kmoney(x):'—')+'</span><span class="b" style="height:'+Math.max(6,Math.round(x/max*120))+'px">'+(x>0?'<i class="t-flor">'+FLOR_HORTENSIA+'</i>':'')+'</span><span>'+DIAS_SEM[i]+'</span></div>').join('')+'</div></div>';
   else h+='<p class="t-vacio">Cuando registres ventas verás aquí qué días vendes más.</p>';
-  h+='</section>';
-  const movs=n.V.map(v=>({t:'v',f:v.fecha,c:v.creada||'',o:v})).concat(n.G.map(g=>({t:'g',f:g.fecha,c:g.creada||'',o:g}))).concat(n.A.map(a=>({t:'a',f:a.fecha,c:'',o:a})))
-    .sort((a,b)=>String(b.f).localeCompare(String(a.f))||String(b.c).localeCompare(String(a.c))).slice(0,5);
-  h+='<section class="t-card"><div class="t-ch"><h2>Últimos movimientos</h2></div>'+(movs.length?'<div class="t-moves">'+movs.map(x=>x.t==='v'?filaVenta(x.o,'Venta · '+esc(metodoBase(x.o.metodo))+' · '+cuandoTxt(x.f)):x.t==='g'?filaGasto(x.o,'Gasto · '+esc(metodoBase(x.o.metodo))+' · '+cuandoTxt(x.f)):filaAbono(x.o,'Apartado · '+esc(x.o.metodo)+' · '+cuandoTxt(x.f))).join('')+'</div>':'<p class="t-vacio">Sin movimientos en este mes.</p>')+'</section></div>';
+  h+='</section></div>';
   /* Métodos, lugar y gastos */
   const met=agrupar(n.V,v=>metodoBase(v.metodo),netoVenta); n.A.forEach(a=>{ met[a.metodo]=r2((met[a.metodo]||0)+a.monto); });
   const cobT=sumar(n.V.filter(v=>metodoBase(v.metodo)==='Tarjeta'));
@@ -743,6 +748,7 @@ const acciones={
   close(){ cerrarHoja(); },
   mes(el){ let m=mesMover(ui.mes, Number(el.dataset.d)); if(m>mesActual()) m=mesActual(); ui.mes=m; renderNow(); },
   'nueva-venta'(){ hojaVenta(null); },
+  'ver-hoy'(){ ui.mes=mesActual(); ui.view='ventas'; window.scrollTo(0,0); renderNow(); },
   'editar-venta'(el){ hojaVenta(el.dataset.id); },
   'nuevo-gasto'(){ hojaGasto(null); },
   'editar-gasto'(el){ hojaGasto(el.dataset.id); },
