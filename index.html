@@ -243,10 +243,32 @@ body[data-view="ventas"] .fondo-flores{display:block;--foto:url("assets/peonias.
 .t-bcol .v{font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:999px;background:var(--a-soft);color:var(--deep);white-space:nowrap}
 .t-bcol .b{width:100%;max-width:46px;border-radius:12px;background:repeating-linear-gradient(-45deg,rgba(255,255,255,.55) 0 7px,transparent 7px 14px),var(--a-soft);border:1px solid var(--glass-line)}
 .t-bcol.top .b{background:repeating-linear-gradient(-45deg,rgba(255,255,255,.3) 0 7px,transparent 7px 14px),linear-gradient(180deg,var(--a2),var(--a1));box-shadow:0 10px 18px -10px var(--a2)}
+.t-bcol.top{padding:0}
 .t-bcol.top .v{background:var(--deep);color:#fff}
 .t-bcol.low .v{background:var(--down-bg);color:var(--down)}
 .t-bcol span:last-child{font-size:11.5px;color:var(--muted);font-weight:600}
-@media (max-width:520px){.t-week{grid-template-columns:1fr}.t-bars{height:170px;gap:5px}.t-bcol .v{font-size:9px;padding:2px 4px}}
+.t-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+/* Flor de hortensia en la punta de cada barra; con .t-anim las barras crecen y las flores se abren */
+.t-bcol .b{position:relative}
+.t-flor{position:absolute;left:50%;top:-13px;width:26px;height:26px;margin-left:-13px;filter:drop-shadow(0 3px 4px rgba(110,52,87,.25))}
+.t-flor svg{display:block;width:100%;height:100%}
+.t-flor .p{fill:var(--a1)}
+.t-bcol .v{margin-bottom:12px}
+.t-bcol.top .v{margin-bottom:18px}
+.t-flor .c{fill:var(--rose-deep)}
+.t-bcol.top .t-flor{width:34px;height:34px;margin-left:-17px;top:-18px}
+.t-bcol.top .t-flor .p{fill:var(--a2)}
+.t-bcol.top .t-flor .c{fill:#fff}
+.t-bcol.low .t-flor .p{fill:var(--mkl)}
+.t-anim .t-bcol .b{transform-origin:bottom;animation:t-crece .9s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*80ms)}
+.t-anim .t-flor{animation:t-florece .6s cubic-bezier(.3,1.6,.5,1) both;animation-delay:calc(var(--i)*80ms + .65s)}
+.t-anim .t-bcol .v{animation:t-aparece .4s ease both;animation-delay:calc(var(--i)*80ms + .8s)}
+.t-bcol.top .t-flor svg{animation:t-mece 3.2s ease-in-out 1.6s infinite;transform-origin:50% 50%}
+@keyframes t-crece{from{transform:scaleY(0)}}
+@keyframes t-florece{from{transform:scale(0) rotate(-120deg);opacity:0}}
+@keyframes t-aparece{from{opacity:0;transform:translateY(6px)}}
+@keyframes t-mece{0%,100%{transform:rotate(0) scale(1)}50%{transform:rotate(14deg) scale(1.08)}}
+@media (max-width:520px){.t-week{grid-template-columns:1fr}.t-bars{height:210px;gap:5px}.t-bcol .v{font-size:9px;padding:2px 4px}}
 .t-moves{display:grid;gap:10px}
 .t-mv{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--glass-2);border:1px solid var(--glass-line);border-radius:999px;padding:7px 8px 7px 16px}
 div.t-mv{cursor:default}
@@ -578,6 +600,9 @@ function filaAbono(a, sub){
 function cuandoTxt(f){ const h=hoyISO(); if(f===h) return 'hoy'; if(f===sumarDias(h,-1)) return 'ayer'; return fCorta(f); }
 function diaTitulo(d){ const t=new Date(d+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'short'}).replace('.',''); const T=t.charAt(0).toUpperCase()+t.slice(1); const h=hoyISO(); return d===h?'Hoy · '+t:d===sumarDias(h,-1)?'Ayer · '+t:T; }
 
+/* Florecita de hortensia: cuatro pétalos redondeados y un centro. */
+const FLOR_HORTENSIA='<svg viewBox="0 0 40 40" aria-hidden="true"><g transform="rotate(45 20 20)"><path class="p" d="M20 19C14 17 12 10 15 6c2-3 8-3 10 0 3 4 1 11-5 13z"/><path class="p" d="M20 19C14 17 12 10 15 6c2-3 8-3 10 0 3 4 1 11-5 13z" transform="rotate(90 20 20)"/><path class="p" d="M20 19C14 17 12 10 15 6c2-3 8-3 10 0 3 4 1 11-5 13z" transform="rotate(180 20 20)"/><path class="p" d="M20 19C14 17 12 10 15 6c2-3 8-3 10 0 3 4 1 11-5 13z" transform="rotate(270 20 20)"/></g><circle class="c" cx="20" cy="20" r="3.2"/></svg>';
+let ultimaAnimSemana='';
 function vResumen(){
   const m=ui.mes, prev=mesMover(m,-1), n=numerosMes(m), p=numerosMes(prev), A=aj(), esAct=m===mesActual();
   const margen = n.ing>0 ? Math.round(n.util/n.ing*100) : 0;
@@ -593,11 +618,13 @@ function vResumen(){
   const gp = Math.max(0,Math.min(100,margen));
   h+='<section class="t-card t-gauge-card"><div class="t-ch"><h2>Margen de ganancia</h2></div><svg class="t-gauge" id="t-gauge" data-p="'+gp+'" viewBox="0 0 300 170" role="img" aria-label="Margen '+margen+'%"></svg><div class="t-gauge-c"><div class="t-big num">'+margen+'%</div><p>de cada peso que entra</p></div><div class="t-gauge-f"><span>Ingresos del mes <b class="num">'+money(n.ing)+'</b></span>'+tchip(n.ing,p.ing)+'</div></section>';
   h+='</div>';
-  /* Ventas por día de la semana (todo el mes) */
+  /* Ventas por día de la semana (todo el mes). La gráfica se anima al entrar o cuando cambian los números,
+     no cada vez que la sincronización vuelve a pintar la pantalla. */
   const sem=[0,0,0,0,0,0,0]; n.V.forEach(v=>{ const d=(new Date(v.fecha+'T12:00:00').getDay()+6)%7; sem[d]=r2(sem[d]+netoVenta(v)); });
   const max=Math.max(...sem), conV=sem.filter(x=>x>0), minV=conV.length>1?Math.min(...conV):-1, best=sem.indexOf(max);
-  h+='<div class="t-g2"><section class="t-card"><div class="t-ch"><h2>Ventas por día</h2><span class="t-chip soft">'+esc(mesSolo(m))+'</span></div>';
-  if(max>0) h+='<div class="t-week"><div class="t-lead"><div class="t-big num">'+kmoney(max)+'</div><p>'+DIAS_LARGO[best].charAt(0).toUpperCase()+DIAS_LARGO[best].slice(1)+' son tus mejores días este mes</p></div><div class="t-bars">'+sem.map((x,i)=>'<div class="t-bcol'+(i===best?' top':x===minV?' low':'')+'"><span class="v num">'+(x>0?kmoney(x):'—')+'</span><span class="b" style="height:'+Math.max(6,Math.round(x/max*140))+'px"></span><span>'+DIAS_SEM[i]+'</span></div>').join('')+'</div></div>';
+  const claveAnim=m+'|'+sem.join(','), animar=claveAnim!==ultimaAnimSemana; ultimaAnimSemana=claveAnim;
+  h+='<div class="t-g2"><section class="t-card"><div class="t-ch"><div style="margin-right:auto;min-width:0"><h2>Últimos movimientos</h2><p class="t-sub">Los días de mayores ventas</p></div><span class="t-chip soft">'+esc(mesSolo(m))+'</span></div>';
+  if(max>0) h+='<div class="t-week"><div class="t-lead"><div class="t-big num">'+kmoney(max)+'</div><p>'+DIAS_LARGO[best].charAt(0).toUpperCase()+DIAS_LARGO[best].slice(1)+' son tus mejores días este mes</p></div><div class="t-bars'+(animar?' t-anim':'')+'">'+sem.map((x,i)=>'<div class="t-bcol'+(i===best?' top':x===minV?' low':'')+'" style="--i:'+i+'"><span class="v num">'+(x>0?kmoney(x):'—')+'</span><span class="b" style="height:'+Math.max(6,Math.round(x/max*120))+'px">'+(x>0?'<i class="t-flor">'+FLOR_HORTENSIA+'</i>':'')+'</span><span>'+DIAS_SEM[i]+'</span></div>').join('')+'</div></div>';
   else h+='<p class="t-vacio">Cuando registres ventas verás aquí qué días vendes más.</p>';
   h+='</section>';
   const movs=n.V.map(v=>({t:'v',f:v.fecha,c:v.creada||'',o:v})).concat(n.G.map(g=>({t:'g',f:g.fecha,c:g.creada||'',o:g}))).concat(n.A.map(a=>({t:'a',f:a.fecha,c:'',o:a})))
@@ -712,7 +739,7 @@ function renderNow(){
 
 /* ============ Acciones ============ */
 const acciones={
-  nav(el){ ui.view=el.dataset.view; window.scrollTo(0,0); renderNow(); },
+  nav(el){ ui.view=el.dataset.view; ultimaAnimSemana=''; window.scrollTo(0,0); renderNow(); },
   close(){ cerrarHoja(); },
   mes(el){ let m=mesMover(ui.mes, Number(el.dataset.d)); if(m>mesActual()) m=mesActual(); ui.mes=m; renderNow(); },
   'nueva-venta'(){ hojaVenta(null); },
