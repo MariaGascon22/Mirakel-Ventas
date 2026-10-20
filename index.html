@@ -177,8 +177,8 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em}
 .login-card .firma{background-color:var(--deep)}
 .inicio-links{display:flex;gap:8px;flex-wrap:wrap}
 
-/* Fondo de flores (peonías y orquídeas desenfocadas) detrás de las tarjetas, solo en Resumen */
-.fondo-flores{position:fixed;inset:0;z-index:0;display:none;background:url("assets/flores.webp") center/cover no-repeat;opacity:.55;pointer-events:none}
+/* Fondo de flores (foto) detrás de las tarjetas, solo en Resumen */
+.fondo-flores{position:fixed;inset:0;z-index:0;display:none;background:linear-gradient(180deg,rgba(255,255,255,.62) 0,rgba(255,255,255,.3) 260px,rgba(255,255,255,.1) 50%),url("assets/flores.webp") center/cover no-repeat;pointer-events:none}
 body[data-view="resumen"] .fondo-flores{display:block}
 #app-shell > .app{position:relative;z-index:1}
 
