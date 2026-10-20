@@ -217,7 +217,7 @@ body[data-view="ventas"] .fondo-flores{display:block;--foto:url("assets/peonias.
 .t-g1{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr) minmax(0,1.08fr);gap:18px}
 .t-stack{display:grid;gap:18px}
 .t-g2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;margin-top:18px}
-.t-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+.t-g3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
 @media (max-width:1000px){.t-g1{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.t-g1 .t-gauge-card{grid-column:1/-1}.t-g3{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.t-g1,.t-g2{grid-template-columns:minmax(0,1fr)}.t-g1 .t-gauge-card{grid-column:auto}}
 .t-hero{background:linear-gradient(140deg,var(--deep) 0%,var(--deep-2) 100%);color:#fff;border-color:transparent}
@@ -609,8 +609,7 @@ function vResumen(){
   const cols={Transferencia:'var(--deep)',Efectivo:'var(--a1)',Tarjeta:'var(--a2)',Otro:'var(--gold)'};
   const metE=METODOS.filter(k=>met[k]>0).map(k=>[k,met[k]]).sort((a,b)=>b[1]-a[1]), totM=metE.reduce((s,x)=>s+x[1],0);
   h+='<div class="t-g3"><section class="t-card"><div class="t-ch"><h2>Ingresos por método de pago</h2></div>'+(totM?'<div class="t-stackbar">'+metE.map(e=>'<i style="flex:'+e[1]+';background:'+cols[e[0]]+'"></i>').join('')+'</div><div class="t-legend">'+metE.map(e=>'<div class="t-lg"><i style="background:'+cols[e[0]]+'"></i><span>'+e[0]+(e[0]==='Tarjeta'&&cobT?'<small>de '+money(cobT)+' cobrados</small>':'')+'</span><b class="num">'+money(e[1])+'</b><em class="num">'+Math.round(e[1]/totM*100)+'%</em></div>').join('')+'</div>':'<p class="t-vacio">Sin ingresos en este mes.</p>')+'</section>';
-  h+='<section class="t-card"><div class="t-ch"><h2>Ventas por lugar</h2><span class="t-chip soft num">'+money(n.v)+'</span></div>'+tBarras(agrupar(n.V,v=>v.lugar||'Sin lugar',netoVenta),null,'place')+'</section>';
-  h+='<section class="t-card"><div class="t-ch"><h2>Gastos por tipo</h2><span class="t-chip soft num">'+money(n.g)+'</span></div>'+tBarras(agrupar(n.G,tipoDe,g=>Number(g.monto)||0))+'</section></div>';
+  h+='<section class="t-card"><div class="t-ch"><h2>Ventas por lugar</h2><span class="t-chip soft num">'+money(n.v)+'</span></div>'+tBarras(agrupar(n.V,v=>v.lugar||'Sin lugar',netoVenta),null,'place')+'</section></div>';
   return h;
 }
 function vVentas(){
