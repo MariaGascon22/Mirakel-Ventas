@@ -291,7 +291,7 @@ div.t-mv{cursor:default}
 .seg-o span{color:var(--muted);font-weight:600}
 .seg-o input:checked+span{color:#fff}
 
-.bottom-nav .in{grid-template-columns:repeat(3,1fr);max-width:420px}
+.bottom-nav .in{grid-template-columns:repeat(2,1fr);max-width:300px}
 .brand-logo{box-shadow:0 6px 14px -6px var(--deep)}
 
 .firma{background:var(--deep)}
@@ -326,7 +326,6 @@ div.t-mv{cursor:default}
     <nav class="tabs" aria-label="Secciones">
       <button class="tab" data-act="nav" data-view="resumen">Resumen</button>
       <button class="tab" data-act="nav" data-view="ventas">Ventas</button>
-      <button class="tab" data-act="nav" data-view="gastos">Gastos</button>
     </nav>
     <span class="nube" id="nube" role="status" hidden></span>
     <button class="icon-btn gear" data-act="nav" data-view="ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -338,7 +337,6 @@ div.t-mv{cursor:default}
   <div class="in">
     <button class="bn" data-act="nav" data-view="resumen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
     <button class="bn" data-act="nav" data-view="ventas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>Ventas</button>
-    <button class="bn" data-act="nav" data-view="gastos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>Gastos</button>
   </div>
 </nav>
 </div>
@@ -623,17 +621,6 @@ function vVentas(){
   h+='<section class="t-card"><div class="t-ch"><h2>Ventas del mes por lugar</h2><span class="t-chip soft num">'+money(n.v)+'</span></div>'+tBarras(agrupar(n.V,v=>v.lugar||'Sin lugar',netoVenta),null,'place')+'</section></div>';
   return h;
 }
-function vGastos(){
-  const m=ui.mes, n=numerosMes(m), por=agrupar(n.G,tipoDe,g=>Number(g.monto)||0);
-  let h=tHead('Gastos','Empaques, joyería e insumos de café','Registrar gasto','nuevo-gasto');
-  h+='<div class="t-kpis k4"><div class="t-card t-hero"><small>Total del mes</small><b class="num">'+money(n.g)+'</b></div>'+TIPOS_GASTO.map(t=>'<div class="t-card"><small>'+esc(t)+'</small><b class="num">'+money(por[t]||0)+'</b></div>').join('')+'</div>';
-  if(!n.G.length){ h+='<section class="t-card t-empty"><h2>Sin gastos en '+esc(mesSolo(m))+'</h2><p>Registra cada compra de empaques, joyería o insumos de café.</p><button class="btn btn-primary" data-act="nuevo-gasto">'+ICON.plus+'Registrar gasto</button></section>'; return h; }
-  const dias={}; n.G.forEach(g=>{ (dias[g.fecha]=dias[g.fecha]||[]).push(g); });
-  Object.keys(dias).sort().reverse().forEach(d=>{ const L=dias[d];
-    h+='<div class="t-dayh"><span>'+esc(diaTitulo(d))+'</span><span class="r"><b class="num">−'+money(sumar(L))+'</b></span></div><div class="t-moves">'+L.map(g=>filaGasto(g,'<span class="t-mchip">'+esc(metodoBase(g.metodo))+'</span>')).join('')+'</div>'; });
-  h+='<section class="t-card" style="margin-top:22px"><div class="t-ch"><h2>Gastos del mes por tipo</h2><span class="t-chip soft num">'+money(n.g)+'</span></div>'+tBarras(por)+'</section>';
-  return h;
-}
 function dibujarGauge(){
   const svg=document.getElementById('t-gauge'); if(!svg) return;
   const p=Number(svg.dataset.p)||0, c1=[215,139,177], c2=[252,118,185], N=26, fill=Math.round(p/100*N), cx=150, cy=152, r1=96, r2=138; let s='';
@@ -712,7 +699,7 @@ function renderNow(){
   if(!Store.cargado) return;
   const main=$('#main');
   if(ui.view==='ajustes' && main.dataset.view==='ajustes' && main.contains(document.activeElement) && document.activeElement.tagName==='INPUT') return;
-  main.innerHTML = ui.view==='ventas'?vVentas():ui.view==='gastos'?vGastos():ui.view==='ajustes'?vAjustes():vResumen();
+  main.innerHTML = ui.view==='ventas'?vVentas():ui.view==='ajustes'?vAjustes():vResumen();
   main.dataset.view=ui.view;
   if(ui.view==='resumen') dibujarGauge();
 }
