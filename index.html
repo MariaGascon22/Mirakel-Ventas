@@ -582,7 +582,7 @@ function vResumen(){
   const m=ui.mes, prev=mesMover(m,-1), n=numerosMes(m), p=numerosMes(prev), A=aj(), esAct=m===mesActual();
   const margen = n.ing>0 ? Math.round(n.util/n.ing*100) : 0;
   const hoyN = esAct ? sumNeto(n.V.filter(v=>v.fecha===hoyISO())) : 0;
-  let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta','<button class="btn" data-act="exportar-mes">'+ICON.dl+'Exportar</button>');
+  let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta');
   h+='<div class="t-g1"><div class="t-stack">';
   h+='<section class="t-card t-hero"><div class="t-ch"><h2>Utilidad del mes</h2></div><div class="t-big num">'+signo(n.util)+'</div><div class="t-krow">'+tchip(n.util,p.util)+'<span class="t-vs">'+(p.util?'vs '+esc(mesSolo(prev)):'Ingresos menos gastos')+'</span></div></section>';
   h+='</div>';
