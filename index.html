@@ -177,6 +177,11 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em}
 .login-card .firma{background-color:var(--deep)}
 .inicio-links{display:flex;gap:8px;flex-wrap:wrap}
 
+/* Fondo de flores (peonías y orquídeas desenfocadas) detrás de las tarjetas, solo en Resumen */
+.fondo-flores{position:fixed;inset:0;z-index:0;display:none;background:url("assets/flores.webp") center/cover no-repeat;opacity:.55;pointer-events:none}
+body[data-view="resumen"] .fondo-flores{display:block}
+#app-shell > .app{position:relative;z-index:1}
+
 /* Barra inferior flotante */
 .bottom-nav{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));padding:6px;border-radius:26px;background:rgba(255,255,255,.74);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid var(--glass-line);box-shadow:0 14px 30px -14px rgba(0,0,0,.3)}
 .bottom-nav .in{grid-template-columns:repeat(4,1fr);max-width:520px}
@@ -317,6 +322,7 @@ div.t-mv{cursor:default}
 </div>
 
 <div id="app-shell" hidden>
+<div class="fondo-flores" aria-hidden="true"></div>
 <div class="app">
   <header class="top">
     <div class="brand">
@@ -578,7 +584,6 @@ function vResumen(){
   let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta','<button class="btn" data-act="exportar-mes">'+ICON.dl+'Exportar</button>');
   h+='<div class="t-g1"><div class="t-stack">';
   h+='<section class="t-card t-hero"><div class="t-ch"><h2>Utilidad del mes</h2></div><div class="t-big num">'+signo(n.util)+'</div><div class="t-krow">'+tchip(n.util,p.util)+'<span class="t-vs">'+(p.util?'vs '+esc(mesSolo(prev)):'Ingresos menos gastos')+'</span></div></section>';
-  h+='<section class="t-card"><div class="t-ch"><h2>Gastos del mes</h2></div><div class="t-big num">'+money(n.g)+'</div><div class="t-krow">'+tchip(n.g,p.g,true)+'<span class="t-vs">'+(p.g?'vs '+esc(mesSolo(prev)):'Empaques, joyería e insumos de café')+'</span></div></section>';
   h+='</div>';
   const meta=Number(A.meta)||0, metaP=meta>0?Math.min(100,Math.round(n.v/meta*100)):0;
   h+='<section class="t-card"><div class="t-ch"><h2>Ventas del mes</h2>'+(esAct&&hoyN>0?'<span class="t-chip up">+'+money(hoyN)+' hoy</span>':'')+'</div><div class="t-big num">'+money(n.v)+'</div>'+(n.comision>0?'<p class="t-fee">Cobrado '+money(n.cobrado)+' · comisión de terminal −'+money(n.comision)+'</p>':'<p class="t-fee">'+n.V.length+(n.V.length===1?' venta registrada':' ventas registradas')+'</p>')+
@@ -694,6 +699,7 @@ function vAjustes(){
 let pend=false;
 function render(){ if(pend) return; pend=true; requestAnimationFrame(()=>{ pend=false; renderNow(); }); }
 function renderNow(){
+  document.body.dataset.view=ui.view;
   pintarNube();
   document.querySelectorAll('[data-act="nav"]').forEach(b=>{ if(b.dataset.view===ui.view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
   if(!Store.cargado) return;
