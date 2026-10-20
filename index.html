@@ -315,11 +315,11 @@ div.t-mv{cursor:default}
 .t-kpis b{display:block;font-size:24px;letter-spacing:-.02em;margin-top:4px}
 @media (max-width:640px){.t-kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.t-kpis:not(.k4){grid-template-columns:1fr 1fr}.t-kpis:not(.k4) .t-hero{grid-column:1/-1}.t-kpis{gap:10px}.t-kpis b{font-size:20px}}
-.t-dayh{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:26px 4px 10px;color:#4F4650;text-shadow:0 0 2px #fff,0 0 6px #fff,0 0 12px rgba(255,255,255,.95),0 0 22px rgba(255,255,255,.75)}
+.t-dayh{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:26px 4px 10px;color:#fff}
 .t-dayh .d{font-size:16px;font-weight:800;letter-spacing:-.01em}
 .t-dayh .r{text-align:right}
 .t-dayh b{font-size:16px;font-weight:800}
-.t-dayh small{display:block;font-size:11.5px;font-weight:700;color:#5F5560}
+.t-dayh small{display:block;font-size:11.5px;font-weight:700;color:#fff}
 /* Ventas agrupadas por artículo dentro de cada día; al tocar el grupo se ven las ventas sueltas */
 .t-pz{display:inline-flex;align-items:center;gap:3px;margin-left:7px;padding:2px 8px 2px 6px;border-radius:999px;background:var(--a-soft);color:var(--deep);font-size:11px;font-weight:800;vertical-align:1px}
 .t-pz svg{width:12px;height:12px}
@@ -687,10 +687,10 @@ function vVentas(){
      '<div class="t-card"><small>Total del mes</small><b class="num">'+money(n.v)+'</b>'+(n.comision>0?'<span class="t-fee">Comisión −'+money(n.comision)+'</span>':'')+'</div><div class="t-card"><small>Piezas</small><b class="num">'+piezas+'</b></div></div>';
   if(!n.V.length){ h+='<section class="t-card t-empty"><h2>Sin ventas en '+esc(mesSolo(m))+'</h2><p>Registra cada venta con el artículo, el monto, el método de pago y el lugar.</p><button class="btn btn-primary" data-act="nueva-venta">'+ICON.plus+'Registrar venta</button></section>'; return h; }
   const dias={}; n.V.forEach(v=>{ (dias[v.fecha]=dias[v.fecha]||[]).push(v); });
-  Object.keys(dias).sort().reverse().forEach(d=>{ const L=dias[d], c=sumar(L), nn=sumNeto(L), pz=L.reduce((s,v)=>s+(Number(v.piezas)||1),0);
+  Object.keys(dias).sort().reverse().forEach(d=>{ const L=dias[d], c=sumar(L), nn=sumNeto(L);
     const arts={}; L.slice().sort((a,b)=>String(b.creada||'').localeCompare(String(a.creada||''))).forEach(v=>{ (arts[articuloDe(v)]=arts[articuloDe(v)]||[]).push(v); });
     const orden=Object.keys(arts).sort((a,b)=>sumNeto(arts[b])-sumNeto(arts[a]));
-    h+='<div class="t-dayh"><span><span class="d">'+esc(diaTitulo(d))+'</span><small>'+pz+(pz===1?' pieza':' piezas')+' · '+L.length+(L.length===1?' venta':' ventas')+'</small></span><span class="r"><b class="num">'+money(nn)+'</b>'+(c!==nn?'<small class="num">Cobrado '+money(c)+'</small>':'')+'</span></div><div class="t-moves">'+orden.map(a=>grupoVentas(d,a,arts[a])).join('')+'</div>'; });
+    h+='<div class="t-dayh"><span><span class="d">'+esc(diaTitulo(d))+'</span></span><span class="r"><b class="num">'+money(nn)+'</b>'+(c!==nn?'<small class="num">Cobrado '+money(c)+'</small>':'')+'</span></div><div class="t-moves">'+orden.map(a=>grupoVentas(d,a,arts[a])).join('')+'</div>'; });
   h+='<div class="t-g2"><section class="t-card"><div class="t-ch"><h2>Ventas del mes por artículo</h2><span class="t-chip soft num">'+money(n.v)+'</span></div>'+tBarras(agrupar(n.V,articuloDe,netoVenta),null,'place')+'</section>';
   h+='<section class="t-card"><div class="t-ch"><h2>Ventas del mes por lugar</h2><span class="t-chip soft num">'+money(n.v)+'</span></div>'+tBarras(agrupar(n.V,v=>v.lugar||'Sin lugar',netoVenta),null,'place')+'</section></div>';
   return h;
