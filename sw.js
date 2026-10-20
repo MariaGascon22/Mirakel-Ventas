@@ -3,7 +3,7 @@
 importScripts('./version.js');
 const VERSION = 'mk-ventas-' + self.APP_VERSION;
 const ARCHIVOS = ['./','./index.html','./version.js','./manifest.webmanifest',
-  './fonts/plus-jakarta-sans.woff2','./assets/logo.webp','./assets/wings.webp','./assets/firma.webp',
+  './fonts/plus-jakarta-sans.woff2','./assets/logo.webp','./assets/wings.webp','./assets/firma.webp','./assets/flores.webp',
   './icons/icon-192.png','./icons/apple-touch-icon.png','./icons/favicon.png'];
 // Se descarga la versión nueva sin usar la caché del navegador; queda en espera hasta que la usuaria toca "Actualizar".
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS.map(u => new Request(u, { cache: 'reload' }))))); });
