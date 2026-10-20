@@ -321,15 +321,11 @@ div.t-mv{cursor:default}
 .t-dayh b{font-size:16px;font-weight:800}
 .t-dayh small{display:block;font-size:11.5px;font-weight:700;color:#fff}
 /* Ventas agrupadas por artículo dentro de cada día; al tocar el grupo se ven las ventas sueltas */
-.t-pz{display:inline-flex;align-items:center;gap:3px;margin-left:7px;padding:2px 8px 2px 6px;border-radius:999px;background:var(--a-soft);color:var(--deep);font-size:11px;font-weight:800;vertical-align:1px}
-.t-pz svg{width:12px;height:12px}
 .t-moves > *{min-width:0}
-.t-grupo{min-width:0}
-.t-grupo > summary{list-style:none;min-width:0}
-.t-grupo > summary::-webkit-details-marker{display:none}
-.t-grupo .t-flecha{display:inline-flex;width:18px;height:18px;color:var(--muted);transition:transform .2s;flex:none}
-.t-grupo[open] .t-flecha{transform:rotate(90deg)}
-.t-grupo-l{display:grid;gap:8px;margin:8px 0 2px 18px;padding-left:12px;border-left:2px solid var(--a-soft)}
+.t-amtr{display:flex;align-items:center;gap:6px}
+.t-pz{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:13.5px;padding:8px 12px;border-radius:999px;background:var(--a2);color:#fff;white-space:nowrap}
+.t-pz svg{width:14px;height:14px}
+@media (max-width:520px){.t-pz{padding:7px 9px;font-size:12.5px}}
 .t-empty{text-align:center;display:grid;justify-items:center;gap:10px;padding:32px 20px;margin-top:18px;color:var(--muted)}
 .t-empty h2{color:var(--ink);font-size:20px}
 .t-version{text-align:center;font-size:12px;color:var(--muted);margin-top:22px}
@@ -420,7 +416,7 @@ const ICON={
   dl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>'
 };
 const data={ ventas:{}, gastos:{}, clientas:{}, cuentas:{}, ajustes:null };
-const ui={ view:'resumen', mes:hoyISO().slice(0,7), sheet:false, abiertos:new Set() };
+const ui={ view:'resumen', mes:hoyISO().slice(0,7), sheet:false };
 function aj(){ return Object.assign({ meta:0 }, data.ajustes||{}); }
 
 /* ============ Usuarios, datos y nube ============
@@ -663,22 +659,25 @@ function vResumen(){
   return h;
 }
 const ICON_PZ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>';
-function pzBadge(pz){ return '<span class="t-pz" title="'+pz+(pz===1?' pieza':' piezas')+'">'+ICON_PZ+pz+'</span>'; }
+function pzBadge(pz){ return '<span class="t-pz num" title="'+pz+(pz===1?' pieza':' piezas')+'" aria-label="'+pz+(pz===1?' pieza':' piezas')+'">'+ICON_PZ+pz+'</span>'; }
 function chipsVenta(L){
   const lug=[...new Set(L.map(v=>v.lugar).filter(Boolean))], met=[...new Set(L.map(v=>metodoBase(v.metodo)))];
   return lug.map(x=>'<span class="t-lchip">'+esc(x)+'</span>').join('')+met.map(x=>'<span class="t-mchip">'+esc(x)+'</span>').join('');
 }
 function horaDe(v){ const t=Date.parse(v.creada||''); return isNaN(t)?'':new Date(t).toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit'}); }
-/* Un artículo vendido en el día: si fue una sola venta se edita directo; si fueron varias, se agrupan y al tocar se ven sueltas. */
+/* Un artículo vendido en el día, con sus ventas sumadas: burbuja de piezas y burbuja del total.
+   Al tocarlo se edita la venta (si fue una) o se elige cuál de sus ventas corregir. */
 function grupoVentas(d, art, L){
   const pz=L.reduce((s,v)=>s+(Number(v.piezas)||1),0), nn=sumNeto(L), c=sumar(L), dif=r2(c-nn);
-  const monto='<span class="t-amtw"><span class="t-amt num">+'+money(nn)+'</span>'+(dif>0?'<small class="num">Cobrado '+money(c)+' · −'+money(dif)+'</small>':(L.length>1?'<small>'+L.length+' ventas</small>':''))+'</span>';
-  if(L.length===1) return '<button class="t-mv" data-act="editar-venta" data-id="'+esc(L[0].id)+'"><span class="t-tx"><b>'+esc(art)+pzBadge(pz)+'</b><span>'+chipsVenta(L)+'</span></span>'+monto+'</button>';
-  const k=d+'|'+art;
-  return '<details class="t-grupo" data-k="'+esc(k)+'"'+(ui.abiertos.has(k)?' open':'')+'><summary class="t-mv"><span class="t-tx"><b>'+esc(art)+pzBadge(pz)+'</b><span>'+chipsVenta(L)+'</span></span>'+monto+'<span class="t-flecha">'+ICON.back.replace('<svg','<svg style="transform:scaleX(-1)"')+'</span></summary>'+
-    '<div class="t-grupo-l">'+L.map(v=>filaVenta(v,(horaDe(v)?esc(horaDe(v))+' · ':'')+esc(metodoBase(v.metodo))+(v.lugar?' · '+esc(v.lugar):''))).join('')+'</div></details>';
+  const monto='<span class="t-amtw"><span class="t-amtr">'+pzBadge(pz)+'<span class="t-amt num">+'+money(nn)+'</span></span>'+(dif>0?'<small class="num">Cobrado '+money(c)+' · −'+money(dif)+'</small>':'')+'</span>';
+  const act=L.length===1?'data-act="editar-venta" data-id="'+esc(L[0].id)+'"':'data-act="ver-grupo" data-d="'+esc(d)+'" data-a="'+esc(art)+'"';
+  return '<button class="t-mv" '+act+'><span class="t-tx"><b>'+esc(art)+'</b><span>'+chipsVenta(L)+'</span></span>'+monto+'</button>';
 }
-document.addEventListener('toggle', e=>{ const g=e.target; if(!g.classList||!g.classList.contains('t-grupo')) return; if(g.open) ui.abiertos.add(g.dataset.k); else ui.abiertos.delete(g.dataset.k); }, true);
+function hojaGrupo(d, art){
+  const L=Object.values(data.ventas).filter(v=>v.fecha===d&&articuloDe(v)===art).sort((a,b)=>String(b.creada||'').localeCompare(String(a.creada||'')));
+  if(!L.length){ cerrarHoja(); return; }
+  abrirHoja(headHoja(esc(art),esc(diaTitulo(d))+' · toca una venta para corregirla')+'<div class="t-moves">'+L.map(v=>filaVenta(v,(horaDe(v)?esc(horaDe(v))+' · ':'')+esc(metodoBase(v.metodo))+(v.lugar?' · '+esc(v.lugar):''))).join('')+'</div>');
+}
 function vVentas(){
   const m=ui.mes, n=numerosMes(m), esAct=m===mesActual();
   const hoyL=n.V.filter(v=>v.fecha===hoyISO()), hoyN=sumNeto(hoyL), hoyC=sumar(hoyL), piezas=n.V.reduce((s,v)=>s+(Number(v.piezas)||1),0);
@@ -785,6 +784,7 @@ const acciones={
   close(){ cerrarHoja(); },
   mes(el){ let m=mesMover(ui.mes, Number(el.dataset.d)); if(m>mesActual()) m=mesActual(); ui.mes=m; renderNow(); },
   'nueva-venta'(){ hojaVenta(null); },
+  'ver-grupo'(el){ hojaGrupo(el.dataset.d, el.dataset.a); },
   'ver-hoy'(){ ui.mes=mesActual(); ui.view='ventas'; window.scrollTo(0,0); renderNow(); },
   'editar-venta'(el){ hojaVenta(el.dataset.id); },
   'nuevo-gasto'(){ hojaGasto(null); },
