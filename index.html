@@ -579,7 +579,7 @@ function selMes(){
   return '<div class="t-mes" role="group" aria-label="Elegir mes"><button data-act="mes" data-d="-1" aria-label="Mes anterior">'+ICON.back+'</button><b>'+esc(mesLabel(m))+'</b><button data-act="mes" data-d="1" aria-label="Mes siguiente"'+(m>=act?' disabled':'')+'><span style="display:inline-flex;transform:scaleX(-1)">'+ICON.back+'</span></button></div>';
 }
 function tHead(t, sub, btn, act, extra){
-  return '<div class="t-phead"><div class="t-ttl"><h1>'+t+'</h1><p>'+sub+'</p></div>'+selMes()+(extra||'')+'<button class="btn btn-primary" data-act="'+act+'">'+ICON.plus+btn+'</button></div>';
+  return '<div class="t-phead"><div class="t-ttl"><h1>'+t+'</h1>'+(sub?'<p>'+sub+'</p>':'')+'</div>'+selMes()+(extra||'')+'<button class="btn btn-primary" data-act="'+act+'">'+ICON.plus+btn+'</button></div>';
 }
 function tBarras(obj, orden, cls){
   let ent=Object.entries(obj).filter(e=>e[1]>0);
@@ -610,7 +610,7 @@ function vResumen(){
   const hoy=hoyISO(), ayer=sumarDias(hoy,-1), todas=Object.values(data.ventas||{});
   const hoyL=todas.filter(v=>v.fecha===hoy).sort((a,b)=>String(b.creada||'').localeCompare(String(a.creada||'')));
   const hoyN=sumNeto(hoyL), ayerN=sumNeto(todas.filter(v=>v.fecha===ayer)), hoyP=hoyL.reduce((s,v)=>s+(Number(v.piezas)||1),0);
-  let h=tHead('Resumen de ventas','Tus ventas, gastos y utilidad de '+esc(mesSolo(m)),'Registrar venta','nueva-venta');
+  let h=tHead('Resumen de ventas','','Registrar venta','nueva-venta');
   h+='<div class="t-g1"><div class="t-stack">';
   h+='<section class="t-card t-hero"><div class="t-ch"><h2>Ventas de Hoy</h2></div><div class="t-big num">'+money(hoyN)+'</div><div class="t-krow">'+(hoyN>0?tchip(hoyN,ayerN):'')+'<span class="t-vs">'+(hoyN>0&&ayerN?'vs ayer':hoyL.length?hoyP+(hoyP===1?' artículo vendido hoy':' artículos vendidos hoy'):'Aún no hay ventas hoy')+'</span></div></section>';
   h+='</div>';
